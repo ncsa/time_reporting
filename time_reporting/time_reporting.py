@@ -138,6 +138,7 @@ def main():
             print '\n'.join(overdue)
 
         for day in overdue:
+            hours = get_hours_from_string('Hours for %s?' % day)
             print submit(day, hours)
 
 if __name__ == "__main__":
