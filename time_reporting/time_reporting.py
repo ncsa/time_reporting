@@ -111,6 +111,7 @@ def main():
     if len(sys.argv) == 2:
         date_string = sys.argv[1]
     elif len(sys.argv) == 8 or len(sys.argv) == 9:
+        date_string = sys.argv[1]
         hours = validate_hours(sys.argv[-7:])
         
     if hours is None:
