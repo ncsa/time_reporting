@@ -1,9 +1,35 @@
 #!/usr/bin/env python2
+"""SOEEA Time Reporting Tool
 
-import requests
+Allows reports to be submitted from a command line interface. 
+
+This library can be particularly effective if used to process exported data from a time tracking application.
+
+The default configuration supports the University of Illinois time reporting web interface.
+
+Usage:
+    report_time [--date=<date>] [--hours=<hours>] 
+
+Options:
+    -h --hours=<hours>  7 numbers, hours worked on Sunday - Saturday [default: '0 8 8 8 8 8 0'] 
+        (Default assumes 40 hour work week M-F)
+    -d --date=<date>   Submit report for date other than the current due report.
+        (Example: 01/21/1999)
+"""
+
+
+# Python native
+from datetime import datetime, timedelta, date
 import getpass
 import sys
-from datetime import datetime, timedelta, date
+import logging
+
+# Dependencies
+import requests
+
+# Included
+# from doctopt import docopt
+import docopt
 
 URL         = "https://hrnet.uihr.uillinois.edu/PTRApplication/index.cfm"
 LOGIN_URL   = "https://eas.admin.uillinois.edu/eas/servlet/login.do"
@@ -11,20 +37,46 @@ OVERDUE_URL = URL + "?fuseaction=TimesheetEntryForm&Overdue=true&"
 SUBMIT_URL  = URL + "?fuseaction=SubmitTimesheet" 
 DATE_FORMAT = '%m/%d/%Y'
 
+# LOGGER
+LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.DEBUG)
+# create file handler which logs even debug messages
+fh = logging.FileHandler('report.log')
+fh.setLevel(logging.DEBUG)
+# create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.ERROR)
+# create formatter and add it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+# add the handlers to the logger
+LOGGER.addHandler(fh)
+LOGGER.addHandler(ch)
+
 USERNAME = getpass.getuser()
 session = requests.session()
 
-def usage():
-    print """time_reporting.py
-             University of Illinois SOEEA Time Reporting Tool
+args = docopt.docopt(__doc__, version='1.0')
 
-             Usage:
-               time_reporting.py [date] [hours]
-               
-               hours - 7 values, for Sunday - Saturday, of hours worked.
-                       Default: 0 8 8 8 8 8 0 (40 hour work week M-F)
-               date  - date for overdue time reporting
-                       Example: 01/21/1999"""
+def prompt_for_hours(date_string):
+    '''Prompt the user for hours for a given week.'''
+
+    choice = 'n'
+    yep = ['', 'Y', 'y', 'yes', 'Yes']
+
+    hours_string = raw_input('Hours for %s? ' % date_string)
+    if not hours_string:
+        hours_string = '0 8 8 8 8 8 0'
+
+    hours = validate_hours(hours_string)
+
+    choice = raw_input('Submit ' + str(hours) + ' for ' + date_string + \
+        '? [Y/n]')
+    if not choice in yep:
+        hours = prompt_for_hours(date_string)
+
+    return hours
 
 def isLoggedIn():
     result = session.get(URL).content
@@ -35,20 +87,22 @@ def isLoggedIn():
 
 def login():
     print "Logging in as %s..." % USERNAME
-    pwd = getpass.getpass()
+    pwd = getpass.getpass('Enterprise ID Password? ')
     result = session.post(LOGIN_URL, data={'inputEnterpriseId': USERNAME, 'password': pwd, 'queryString': 'null', 'BTN_LOGIN': 'Login'}, allow_redirects=True)
     return result.content
 
 def get_hours_from_string(hours_string):
     return validate_hours(hours_string.split(' '))
 
-def validate_hours(hours):
+def validate_hours(hours_string):
     try:
-        hours = [float(x) for x in sys.argv[-7:]]
+        hours_values = hours_string.split(' ')
+        hours = [float(value) for value in hours_values]
         return hours
     except ValueError:
-        print "Invalid hours provided. Must be floats."
-        usage()
+        print "Error: Invalid hours provided."
+        print "All values must be numbers in float format."
+        print __doc__
         return None 
 
 def submit(date_string=None, hours=None, silent = False):
@@ -56,14 +110,8 @@ def submit(date_string=None, hours=None, silent = False):
     # Go to the requested date.
     if date_string is None:
         date_string = get_recent_sunday()
-    
-# Prompt to be sure entered value is correct.
-    if not silent:
-        choice = raw_input('Submit ' + str(hours) + ' for ' + date_string + \
-                '? [Y/n]')
-        yep = ['', 'Y', 'y', 'yes', 'Yes']
-        if not choice in yep:
-            return "Cancelled by user." 
+
+    # TODO Prompt for hours...
 
     url = get_url_for_date(date_string)
     # print url
@@ -85,6 +133,8 @@ def submit(date_string=None, hours=None, silent = False):
     d['weekTotalHours'] = int(total/60)
     d['weekTotalMinutes'] = total % 60
     result = session.post(SUBMIT_URL, data=d, allow_redirects=True)
+    LOGGER.info('Result: %s', result)
+    LOGGER.info('Content: %s', result.content)
     if "You have successfully submitted" in result.content:
         return "Successfully submitted %s for %s." % (str(hours), date_string)
     else:
@@ -107,16 +157,15 @@ def main():
     date_string = None
     hours = None
     result = ''
-# Parse command line arguments.
-    if len(sys.argv) == 2:
-        date_string = sys.argv[1]
-    elif len(sys.argv) == 8 or len(sys.argv) == 9:
-        date_string = sys.argv[1]
-        hours = validate_hours(sys.argv[-7:])
-        
-    if hours is None:
-        usage()
-        sys.exit()
+    
+    if '<hours>' in args:
+        hours_string = args['<hours>'] 
+        hours = validate_hours(hours_string)
+    if '<date>' in args:
+        date_string = args['<date>']
+
+    if not date_string:
+        date_string = get_recent_sunday()
 
 # Login
     if not isLoggedIn():
@@ -126,10 +175,14 @@ def main():
     if "Edit" in result:
         print "Time reporting for this week is up to date."
     else:
+        if not hours:
+            hours = prompt_for_hours(date_string)
         print submit(date_string, hours)
 
         # Review overdue time
-    if "Submission of time for the following week(s) is overdue." in result:
+    if not "Submission of time for the following week(s) is overdue." in result:
+        print "Time reporting is up to date."
+    else:
         overdue = [x.strip() for x in result[result.find('id="pastDueWeek">'):result.find('</select>&nbsp;<input type="submit" id="getPastDueTimeEntryForm"')].split('\n') if x.strip()][1:]
         overdue = [x[x.find('month='):x.find('">')] for x in overdue]
         overdue = [x[x.find('Week=')+5:] for x in overdue]
@@ -139,7 +192,7 @@ def main():
             print '\n'.join(overdue)
 
         for day in overdue:
-            hours = get_hours_from_string('Hours for %s?' % day)
+            hours = prompt_for_hours(day)
             print submit(day, hours)
 
 if __name__ == "__main__":
