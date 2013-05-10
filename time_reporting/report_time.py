@@ -98,6 +98,11 @@ def validate_hours(hours_string):
     try:
         hours_values = hours_string.split(' ')
         hours = [float(value) for value in hours_values]
+
+        if len(hours) != 7:
+            print "Expected 7 values for Sunday-Saturday"
+            return None
+
         return hours
     except ValueError:
         print "Error: Invalid hours provided."
@@ -194,6 +199,7 @@ def main():
         for day in overdue:
             hours = prompt_for_hours(day)
             print submit(day, hours)
+        print "Time reporting is now up to date."
 
 if __name__ == "__main__":
     main()
