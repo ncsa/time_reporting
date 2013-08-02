@@ -37,9 +37,9 @@ OVERDUE_URL = URL + "?fuseaction=TimesheetEntryForm&Overdue=true&"
 SUBMIT_URL  = URL + "?fuseaction=SubmitTimesheet" 
 DATE_FORMAT = '%m/%d/%Y'
 
-# LOGGER
-LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
+# _LOGGER
+_LOGGER = logging.getLogger(__name__)
+_LOGGER.setLevel(logging.DEBUG)
 # create file handler which logs even debug messages
 fh = logging.FileHandler('report.log')
 fh.setLevel(logging.DEBUG)
@@ -50,12 +50,68 @@ ch.setLevel(logging.ERROR)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 fh.setFormatter(formatter)
 ch.setFormatter(formatter)
-# add the handlers to the logger
-LOGGER.addHandler(fh)
-LOGGER.addHandler(ch)
+# add the handlers to the _LOGGER
+_LOGGER.addHandler(fh)
+_LOGGER.addHandler(ch)
 
 USERNAME = getpass.getuser()
-session = requests.session()
+
+class TimeReportBrowser(object):
+    def __init__(self):
+        self.session = requests.session()
+        self.result = self.session.get(URL)
+    
+    def is_logged_in(self):
+        '''Check whether logged in'''
+        if "Enterprise Authentication Service" in self.result.content:
+            return False
+        else:
+            return True
+
+    def login(self):
+        '''Log in to the webpage.'''
+        while not self.is_logged_in():
+            print "Logging in as %s..." % USERNAME
+            pwd = getpass.getpass('Enterprise ID Password? ')
+            self.result = self.session.post(LOGIN_URL, data={'inputEnterpriseId': USERNAME, 'password': pwd, 'queryString': 'null', 'BTN_LOGIN': 'Login'}, allow_redirects=True)
+
+    def submit(self, date_string=None, hours=None, silent = False):
+        '''Submit time worked during a chosen week.'''
+
+# Login
+        self.login()
+
+        # Go to the requested date.
+        if date_string is None:
+            date_string = get_recent_sunday()
+
+        # Fetch page for the chosen date.
+        url = get_url_for_date(date_string)
+        self.result = self.session.get(url)
+
+        if len(hours) != 7:
+            raise ValueError("Expected 7 values for Sunday-Saturday")
+        d = {}
+        days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+        total = 0
+        for i in range(len(days)):
+            d[days[i] + "TimesheetHourValue"] = int(hours[i])
+            total += int(hours[i]) * 60
+            minutes = hours[i] % 1
+            if minutes not in [0.0, 0.25, 0.5, 0.75]:
+                raise ValueError("Please only use hours rounded to the nearest quarter-hour.")
+            d[days[i] + "TimesheetMinuteValue"] = minutes
+            total += minutes
+        d['weekTotalHours'] = int(total/60)
+        d['weekTotalMinutes'] = total % 60
+        self.result = self.session.post(SUBMIT_URL, data=d, allow_redirects=True)
+        _LOGGER.info('Result: %s', self.result)
+        _LOGGER.info('Content: %s', self.result.content)
+        if "You have successfully submitted" in self.result.content:
+            return "Successfully submitted %s for %s." % (str(hours), date_string)
+        else:
+            return "Unable to submit %s for %s. " % (str(hours), date_string) + \
+                    "Have you already submitted this date?" 
 
 args = docopt.docopt(__doc__, version='1.0')
 
@@ -65,31 +121,19 @@ def prompt_for_hours(date_string):
     choice = 'n'
     yep = ['', 'Y', 'y', 'yes', 'Yes']
 
-    hours_string = raw_input('Hours for %s? ' % date_string)
+    hours_string = raw_input('Hours for the week starting on %s? ' % date_string)
+    import pdb; pdb.set_trace()
     if not hours_string:
         hours_string = '0 8 8 8 8 8 0'
 
     hours = validate_hours(hours_string)
 
-    choice = raw_input('Submit ' + str(hours) + ' for ' + date_string + \
+    choice = raw_input('Submit ' + str(hours) + ' for the week starting on ' + date_string + \
         '? [Y/n]')
     if not choice in yep:
         hours = prompt_for_hours(date_string)
 
     return hours
-
-def isLoggedIn():
-    result = session.get(URL).content
-    if "easFormId" in result:
-        return False
-    else:
-        return True
-
-def login():
-    print "Logging in as %s..." % USERNAME
-    pwd = getpass.getpass('Enterprise ID Password? ')
-    result = session.post(LOGIN_URL, data={'inputEnterpriseId': USERNAME, 'password': pwd, 'queryString': 'null', 'BTN_LOGIN': 'Login'}, allow_redirects=True)
-    return result.content
 
 def get_hours_from_string(hours_string):
     return validate_hours(hours_string.split(' '))
@@ -110,42 +154,6 @@ def validate_hours(hours_string):
         print __doc__
         return None 
 
-def submit(date_string=None, hours=None, silent = False):
-
-    # Go to the requested date.
-    if date_string is None:
-        date_string = get_recent_sunday()
-
-    # TODO Prompt for hours...
-
-    url = get_url_for_date(date_string)
-    # print url
-    result = session.get(url).content
-
-    if len(hours) != 7:
-        raise ValueError("Expected 7 values for Sunday-Saturday")
-    d = {}
-    days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
-    total = 0
-    for i in range(len(days)):
-        d[days[i] + "TimesheetHourValue"] = int(hours[i])
-        total += int(hours[i]) * 60
-        minutes = hours[i] % 1
-        if minutes not in [0.0, 0.25, 0.5, 0.75]:
-            raise ValueError("Please only use hours rounded to the nearest quarter-hour.")
-        d[days[i] + "TimesheetMinuteValue"] = minutes
-        total += minutes
-    d['weekTotalHours'] = int(total/60)
-    d['weekTotalMinutes'] = total % 60
-    result = session.post(SUBMIT_URL, data=d, allow_redirects=True)
-    LOGGER.info('Result: %s', result)
-    LOGGER.info('Content: %s', result.content)
-    if "You have successfully submitted" in result.content:
-        return "Successfully submitted %s for %s." % (str(hours), date_string)
-    else:
-        return "Unable to submit %s for %s. " % (str(hours), date_string) + \
-                "Have you already submitted this date?" 
-
 def get_url_for_date(date_string):
     month, day, year = [int(x) for x in date_string.split('/')]
     the_date = date(year, month, day)
@@ -159,9 +167,10 @@ def get_recent_sunday():
     return day.strftime(DATE_FORMAT)
 
 def main():
+
+    br = TimeReportBrowser()
     date_string = None
     hours = None
-    result = ''
     
     if '<hours>' in args:
         hours_string = args['<hours>'] 
@@ -171,24 +180,22 @@ def main():
 
     if not date_string:
         date_string = get_recent_sunday()
-
-# Login
-    if not isLoggedIn():
-        result = login()
-   
+  
 # Submit time
-    if "Edit" in result:
+    br.login()
+    if "Edit" in br.result.content:
         print "Time reporting for this week is up to date."
     else:
         if not hours:
             hours = prompt_for_hours(date_string)
-        print submit(date_string, hours)
+        print br.submit(date_string, hours)
 
         # Review overdue time
-    if not "Submission of time for the following week(s) is overdue." in result:
+    if not "Submission of time for the following week(s) is overdue." in br.result.content:
         print "Time reporting is up to date."
     else:
-        overdue = [x.strip() for x in result[result.find('id="pastDueWeek">'):result.find('</select>&nbsp;<input type="submit" id="getPastDueTimeEntryForm"')].split('\n') if x.strip()][1:]
+        content = br.result.content
+        overdue = [x.strip() for x in content[content.find('id="pastDueWeek">'):content.find('</select>&nbsp;<input type="submit" id="getPastDueTimeEntryForm"')].split('\n') if x.strip()][1:]
         overdue = [x[x.find('month='):x.find('">')] for x in overdue]
         overdue = [x[x.find('Week=')+5:] for x in overdue]
 
@@ -198,7 +205,7 @@ def main():
 
         for day in overdue:
             hours = prompt_for_hours(day)
-            print submit(day, hours)
+            print br.submit(day, hours)
         print "Time reporting is now up to date."
 
 if __name__ == "__main__":
