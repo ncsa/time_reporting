@@ -11,7 +11,7 @@ Usage:
     report_time [--date=<date>] [--hours=<hours>] [--password-file=<password_file>]
 
 Options:
-    -h --hours=<hours>  7 numbers, hours worked on Sunday - Saturday [default: '0 8 8 8 8 8 0'] 
+    -h --hours=<hours>  7 numbers, hours worked on Sunday - Saturday i.e. '0 8 8 8 8 8 0'
         (Default assumes 40 hour work week M-F)
     -d --date=<date>   Submit report for date other than the current due report.
         (Example: 01/21/1999)
@@ -189,9 +189,10 @@ def main():
     date_string = None
     hours = None
     
-    # if '--hours' in args:
-        # hours_string = args['--hours'] 
-        # hours = validate_hours(hours_string)
+    if '--hours' in args:
+        hours_string = args['--hours'] 
+        if hours_string:
+            hours = validate_hours(hours_string)
 # FIXME - Default is string not array.
     if '--date' in args:
         date_string = args['--date']
