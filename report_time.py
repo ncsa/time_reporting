@@ -122,7 +122,6 @@ class TimeReportBrowser(object):
                     "Have you already submitted this date?" 
 
 args = docopt.docopt(__doc__, version='1.0')
-print args
 
 USERNAME = getpass.getuser()
 if args['--user']: USERNAME = args['--user']
@@ -205,9 +204,6 @@ def main():
     if not date_string:
         date_string = get_recent_sunday()
 
-    print "date: %s" % date_string
-    print "hours: %s" % hours
-  
     # Submit time
     br.login()
     if "Edit" in br.result.content:
