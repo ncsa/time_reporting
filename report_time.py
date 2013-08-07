@@ -8,23 +8,25 @@ This library can be particularly effective if used to process exported data from
 The default configuration supports the University of Illinois time reporting web interface.
 
 Usage:
-    report_time [--date=<date>] [--hours=<hours>] [--password-file=<password_file>]
+    report_time [--date=<date>] [--hours=<hours>] [--user=<username>] [--password-file=<password_file>]
 
 Options:
     -h --hours=<hours>  7 numbers, hours worked on Sunday - Saturday i.e. '0 8 8 8 8 8 0'
         (Default assumes 40 hour work week M-F)
-    -d --date=<date>   Submit report for date other than the current due report.
+    -d --date=<date>  Submit report for date other than the current due report.
         (Example: 01/21/1999)
-    -p --password-file=<password_file> A GPG Encrypted file the contents of which are your password.
+    -u --user=<username>  The username to login as.
+    -p --password-file=<password_file>  A GPG Encrypted file the contents of which are your password.
 """
 
 
 # Python native
 from datetime import datetime, timedelta, date
 import getpass
-import sys
 import logging
+import os
 import subprocess
+import sys
 
 # Dependencies
 import requests
@@ -56,9 +58,6 @@ ch.setFormatter(formatter)
 _LOGGER.addHandler(fh)
 _LOGGER.addHandler(ch)
 
-USERNAME = getpass.getuser()
-_PASSWORD = None
-
 class TimeReportBrowser(object):
     def __init__(self):
         self.session = requests.session()
@@ -87,7 +86,7 @@ class TimeReportBrowser(object):
     def submit(self, date_string=None, hours=None, silent = False):
         '''Submit time worked during a chosen week.'''
 
-# Login
+        # Login
         self.login()
 
         # Go to the requested date.
@@ -123,14 +122,20 @@ class TimeReportBrowser(object):
                     "Have you already submitted this date?" 
 
 args = docopt.docopt(__doc__, version='1.0')
-
 print args
-if '--password-file' in args:
+
+USERNAME = getpass.getuser()
+if args['--user']: USERNAME = args['--user']
+
+_PASSWORD = None
+if args['--password-file']:
+    if not os.path.isfile(args['--password-file']):
+        print "To create a password file, run:"
+        print "  gpg --gen-key"
+        print "  vim password.txt"
+        print "  gpg -r email@example.com -e password.txt\n"
     _PASSWORD = subprocess.check_output('gpg -qd %s' % args['--password-file'], shell=True).replace('\n', '')
     print "Loaded password from %s" % args['--password-file']
-
-# if not _PASSWORD:
-#     print "To create a passwordfile, run:\ngpg --gen-key; vim report_pass.txt; gpg - e report_pass.txt"
 
 def prompt_for_hours(date_string):
     '''Prompt the user for hours for a given week.'''
@@ -189,18 +194,21 @@ def main():
     date_string = None
     hours = None
     
-    if '--hours' in args:
+    if args['--hours']:
         hours_string = args['--hours'] 
         if hours_string:
             hours = validate_hours(hours_string)
-# FIXME - Default is string not array.
-    if '--date' in args:
+    # FIXME - Default is string not array.
+    if args['--date']:
         date_string = args['--date']
 
     if not date_string:
         date_string = get_recent_sunday()
+
+    print "date: %s" % date_string
+    print "hours: %s" % hours
   
-# Submit time
+    # Submit time
     br.login()
     if "Edit" in br.result.content:
         print "Time reporting for this week is up to date."
