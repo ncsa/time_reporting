@@ -144,7 +144,6 @@ def prompt_for_hours(date_string):
     yep = ['', 'Y', 'y', 'yes', 'Yes']
 
     hours_string = raw_input('Hours for the week starting on %s? ' % date_string)
-    import pdb; pdb.set_trace()
     if not hours_string:
         hours_string = '0 8 8 8 8 8 0'
 
@@ -211,8 +210,10 @@ def main():
         if not args['--quiet']: print "Time reporting for this week is up to date."
     else:
         if not hours:
-            hours = prompt_for_hours(date_string)
-        print br.submit(date_string, hours)
+            if not args['--quiet']:
+                hours = prompt_for_hours(date_string)
+        outcome = br.submit(date_string, hours)
+        if not args['--quiet']: print outcome
 
         # Review overdue time
     if not "Submission of time for the following week(s) is overdue." in br.result.content:
@@ -228,9 +229,10 @@ def main():
             print '\n'.join(overdue)
 
         for day in overdue:
-            hours = prompt_for_hours(day)
-            print br.submit(day, hours)
-        print "Time reporting is now up to date."
+            if not args['--quiet']:
+                hours = prompt_for_hours(day)
+                print br.submit(day, hours)
+        if not args['--quiet']: print "Time reporting is now up to date."
 
 if __name__ == "__main__":
     main()
