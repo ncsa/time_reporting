@@ -8,7 +8,7 @@ This library can be particularly effective if used to process exported data from
 The default configuration supports the University of Illinois time reporting web interface.
 
 Usage:
-    report_time [--date=<date>] [--hours=<hours>] [--user=<username>] [--password-file=<password_file>]
+    report_time [--date=<date>] [--hours=<hours>] [--user=<username>] [--password-file=<password_file> --quiet]
 
 Options:
     -h --hours=<hours>  7 numbers, hours worked on Sunday - Saturday i.e. '0 8 8 8 8 8 0'
@@ -17,6 +17,7 @@ Options:
         (Example: 01/21/1999)
     -u --user=<username>  The username to login as.
     -p --password-file=<password_file>  A GPG Encrypted file the contents of which are your password.
+    -q --quiet  Suppress all output other than errors.
 """
 
 
@@ -45,7 +46,7 @@ DATE_FORMAT = '%m/%d/%Y'
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.DEBUG)
 # create file handler which logs even debug messages
-fh = logging.FileHandler('report.log')
+fh = logging.FileHandler('/tmp/report_time.log')
 fh.setLevel(logging.DEBUG)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
@@ -74,9 +75,9 @@ class TimeReportBrowser(object):
         '''Log in to the webpage.'''
         tries = 0
         while not self.is_logged_in():
-            print "Logging in as %s..." % USERNAME
+            if not args['--quiet']: print "Logging in as %s..." % USERNAME
             if tries == 0 and _PASSWORD:
-                print "Using password from file."
+                if not args['--quiet']: print "Using password from file."
                 pwd = _PASSWORD
             else:
                 pwd = getpass.getpass('Enterprise ID Password? ')
@@ -134,7 +135,7 @@ if args['--password-file']:
         print "  vim password.txt"
         print "  gpg -r email@example.com -e password.txt\n"
     _PASSWORD = subprocess.check_output('gpg -qd %s' % args['--password-file'], shell=True).replace('\n', '')
-    print "Loaded password from %s" % args['--password-file']
+    if not args['--quiet']: print "Loaded password from %s" % args['--password-file']
 
 def prompt_for_hours(date_string):
     '''Prompt the user for hours for a given week.'''
@@ -207,7 +208,7 @@ def main():
     # Submit time
     br.login()
     if "Edit" in br.result.content:
-        print "Time reporting for this week is up to date."
+        if not args['--quiet']: print "Time reporting for this week is up to date."
     else:
         if not hours:
             hours = prompt_for_hours(date_string)
@@ -215,7 +216,7 @@ def main():
 
         # Review overdue time
     if not "Submission of time for the following week(s) is overdue." in br.result.content:
-        print "Time reporting is up to date."
+        if not args['--quiet']: print "Time reporting is up to date."
     else:
         content = br.result.content
         overdue = [x.strip() for x in content[content.find('id="pastDueWeek">'):content.find('</select>&nbsp;<input type="submit" id="getPastDueTimeEntryForm"')].split('\n') if x.strip()][1:]
