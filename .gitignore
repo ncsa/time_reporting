@@ -1,0 +1,4 @@
+*.pyc
+*.gpg
+Session.vim
+*.log
