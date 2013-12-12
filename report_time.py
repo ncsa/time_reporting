@@ -140,10 +140,18 @@ if args['--password-file']:
 def prompt_for_hours(date_string):
     '''Prompt the user for hours for a given week.'''
 
+    # As a courtesy, show end of week as well.
+    end_of_week = datetime.strptime(date_string, DATE_FORMAT) \
+            + timedelta(days=6)
+
     choice = 'n'
     yep = ['', 'Y', 'y', 'yes', 'Yes']
 
-    hours_string = raw_input('Hours for the week starting on %s? ' % date_string)
+    hours_string = raw_input(
+            'Hours for the week starting on {start}, ending on {end}? '.format(
+                start = date_string,
+                end = end_of_week.strftime(DATE_FORMAT),
+                ))
     if not hours_string:
         hours_string = '0 8 8 8 8 8 0'
 
@@ -223,6 +231,9 @@ def main():
         overdue = [x.strip() for x in content[content.find('id="pastDueWeek">'):content.find('</select>&nbsp;<input type="submit" id="getPastDueTimeEntryForm"')].split('\n') if x.strip()][1:]
         overdue = [x[x.find('month='):x.find('">')] for x in overdue]
         overdue = [x[x.find('Week=')+5:] for x in overdue]
+# Strip out additional cruft.
+        overdue = [x[:x.find('&CurrentWk')] for x in overdue]
+        # overdue = [x[:x.find('Year=')] for x in overdue]
 
         print "Warning: Overdue time reports (" + str(len(overdue)) + ")."
         if len(overdue) < 10:
