@@ -4,12 +4,10 @@ python setup.py install
 
 Usage:
 
+	report_time [--date=<date>] [--hours=<hours>] [--user=<username>] [--password-file=<password_file> --quiet]
   time_reporting.py [date] [hours]                                                                                                                                                                                                                               
+	--hours Hours for the week are expected to be 7 single digit values for Sunday - Saturday, in hours worked.
+		Example: 0 8 8 8 8 8 0 indicates a standard 40 hour work week, Monday through Friday. 
 
-
-   hours - 7 values, for Sunday - Saturday, of hours worked.                                                                                                                                                                                                      
-          Default: 0 8 8 8 8 8 0 (40 hour work week M-F)                                                                                                                                                                                                         
-
-   date  - date for overdue time reporting                                                                                                                                                                                                                        
-          Example: 01/21/1999
-
+	--date 	Date for an overdue time report
+		Example: 01/21/1999 
