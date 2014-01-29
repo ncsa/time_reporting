@@ -5,7 +5,7 @@ Install:
 Usage:
 
 	report_time [--date=<date>] [--hours=<hours>] [--user=<username>] [--password-file=<password_file> --quiet]
-  time_reporting.py [date] [hours]                                                                                                                                                                                                                               
+
 	--hours Hours for the week are expected to be 7 single digit values for Sunday - Saturday, in hours worked.
 		Example: 0 8 8 8 8 8 0 indicates a standard 40 hour work week, Monday through Friday. 
 
