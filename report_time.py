@@ -8,13 +8,14 @@ This library can be particularly effective if used to process exported data from
 The default configuration supports the University of Illinois time reporting web interface.
 
 Usage:
-    report_time [--date=<date>] [--hours=<hours>] [--user=<username>] [--password-file=<password_file> --quiet]
+    report_time [--date=<date>] [--hours=<hours>] [--user=<username>] [--password-file=<password_file>] [--quiet] [--five-day]
 
 Options:
     -h --hours=<hours>  7 numbers, hours worked on Sunday - Saturday i.e. '0 8 8 8 8 8 0'
         (Default assumes 40 hour work week M-F)
     -d --date=<date>  Submit report for date other than the current due report.
         (Example: 01/21/1999)
+    -f --five-day   assume a five day work week
     -u --user=<username>  The username to login as.
     -p --password-file=<password_file>  A GPG Encrypted file the contents of which are your password.
     -q --quiet  Suppress all output other than errors.
@@ -98,8 +99,13 @@ class TimeReportBrowser(object):
         url = get_url_for_date(date_string)
         self.result = self.session.get(url)
 
+        # Implicitly convert 5 day week into 7 day week.
+        if len(hours) == 5: 
+            hours.insert(0, 0)
+            hours.append(0)
+
         if len(hours) != 7:
-            raise ValueError("Expected 7 values for Sunday-Saturday")
+            raise ValueError("Incorrect number of values for the week.")
         d = {}
         days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
         total = 0
@@ -124,6 +130,8 @@ class TimeReportBrowser(object):
 
 args = docopt.docopt(__doc__, version='1.0')
 
+FIVE_DAY = args['--five-day']
+
 USERNAME = getpass.getuser()
 if args['--user']: USERNAME = args['--user']
 
@@ -142,7 +150,15 @@ def prompt_for_hours(date_string):
 
     # As a courtesy, show end of week as well.
     end_of_week = datetime.strptime(date_string, DATE_FORMAT) \
-            + timedelta(days=6)
+
+    # Convert to five day week, if requested.
+    if FIVE_DAY:
+        start_date = datetime.strptime(date_string, DATE_FORMAT) \
+            + timedelta(days=1)
+        date_string = start_date.strftime(DATE_FORMAT)
+
+        end_of_week = datetime.strptime(date_string, DATE_FORMAT) \
+            + timedelta(days=4)
 
     choice = 'n'
     yep = ['', 'Y', 'y', 'yes', 'Yes']
@@ -154,6 +170,8 @@ def prompt_for_hours(date_string):
                 ))
     if not hours_string:
         hours_string = '0 8 8 8 8 8 0'
+        if FIVE_DAY:
+            hours_string = '8 8 8 8 8'
 
     hours = validate_hours(hours_string)
 
@@ -172,9 +190,14 @@ def validate_hours(hours_string):
         hours_values = hours_string.split(' ')
         hours = [float(value) for value in hours_values]
 
-        if len(hours) != 7:
-            print "Expected 7 values for Sunday-Saturday"
-            return None
+        if FIVE_DAY:
+            if len(hours) != 5:
+                print "Expected 7 values for Monday-Friday"
+                return None
+        else:
+            if len(hours) != 7:
+                print "Expected 7 values for Sunday-Saturday"
+                return None
 
         return hours
     except ValueError:
