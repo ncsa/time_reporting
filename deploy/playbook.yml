@@ -1,0 +1,21 @@
+---
+- hosts: all
+  user: vagrant
+  gather_facts: False
+  sudo: no
+  vars:
+    - username: vagrant
+    - home_dir: "/home/{{ username }}"
+  tasks:
+    - name: python stuff
+      apt: name={{ item }}
+      sudo: yes
+      with_items:
+        - python
+        - python-pip
+    - name: pip stuff
+      pip: name={{ item }}
+      sudo: yes
+      with_items:
+        - virtualenv
+    - include: ansible-vim/vim.yml
