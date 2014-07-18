@@ -4,10 +4,11 @@ Report Time Tool
 Installing 
 ------------
 
-Installation::
+User Installation::
 
     git clone https://github.com/edthedev/time_reporting.git
     cd time_reporting
+    pip install -r requirements.txt
     ./report_time.py # See usage below.
 
 Usage::
@@ -43,6 +44,21 @@ Get the source::
 Create a virtual environment::
 
    virtualenv venv 
+
+Install the required libraries into the virtual environment::
+
    source venv/bin/activate
    pip install -r requirements.txt
+
+I'm not completely certain what the point is, but we can create a Wheel out of the requests module.
+Maybe we can use this when creating a nicely packed download for Mac users...?::
+
+   >virtualenv venv 
+   >source venv/bin/activate
+   >pip wheel -r requirements.txt
+   Downloading/unpacking requests==2.3.0 (from -r requirements.txt (line 1))
+   Downloading requests-2.3.0-py2.py3-none-any.whl (452kB): 452kB downloaded
+   Saved ./wheelhouse/requests-2.3.0-py2.py3-none-any.whl
+   > ???
+   > PROFIT!
 
