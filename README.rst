@@ -1,6 +1,9 @@
 Report Time Tool
 =================
 
+Installing 
+------------
+
 Installation::
 
     git clone https://github.com/edthedev/time_reporting.git
@@ -21,3 +24,25 @@ Options::
     -u --user=<username>  The username to login as.
     -p --password-file=<password_file>  A GPG Encrypted file the contents of which are your password.
     -q --quiet  Suppress all output other than errors.
+
+Contributing
+-------------
+
+Get the source::
+
+    git clone https://github.com/edthedev/time_reporting.git
+    cd time_reporting
+
+(Optional) Bring up a Vagrant VM::
+
+    cd time_reporting/deploy
+    vagrant up
+    vagrant ssh
+    cd /source
+
+Create a virtual environment::
+
+   virtualenv venv 
+   source venv/bin/activate
+   pip install -r requirements.txt
+
