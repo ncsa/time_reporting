@@ -3,5 +3,4 @@
 Session.vim
 *.log
 .vagrant
-venv
-wheelhouse
+ENV
