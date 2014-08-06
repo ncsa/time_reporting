@@ -27,6 +27,8 @@ User Installation::
     pip install -r requirements.txt
     ./report_time.py # See usage below.
 
+Using
+------
 Usage::
 
     cd time_reporting
@@ -43,7 +45,3 @@ Options::
     -u --user=<username>  The username to login as.
     -p --password-file=<password_file>  A GPG Encrypted file the contents of which are your password.
     -q --quiet  Suppress all output other than errors.
-
-Contributing
--------------
-
