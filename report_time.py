@@ -151,26 +151,30 @@ if args['--password-file']:
 def prompt_for_hours(date_string):
     '''Prompt the user for hours for a given week.'''
 
-    # As a courtesy, show end of week as well.
-    end_of_week = datetime.strptime(date_string, DATE_FORMAT) \
+    # Start date.
+    start_date = \
+        datetime.strptime(date_string, DATE_FORMAT) 
+
+    # As a courtesy, show end date as well. (Saturday)
+    end_date = \
+        datetime.strptime(date_string, DATE_FORMAT) \
+        + timedelta(days=6)
 
     # Convert to five day week, if requested.
     if FIVE_DAY:
-        start_date = \
-            datetime.strptime(date_string, DATE_FORMAT) \
-            + timedelta(days=1)
+        # For Five day mode, show Monday, not Sunday.
         date_string = start_date.strftime(DATE_FORMAT)
-        end_of_week = \
-            datetime.strptime(date_string, DATE_FORMAT) \
-            + timedelta(days=4)
+        start_date += timedelta(days=1)
+        # For five day mode, show Friday, not Saturday.
+        end_date -= timedelta(days=1)
 
     choice = 'n'
     yep = ['', 'Y', 'y', 'yes', 'Yes']
 
     hours_string = raw_input(
             'Hours for the week starting on {start}, ending on {end}? '.format(
-                start = date_string,
-                end = end_of_week.strftime(DATE_FORMAT),
+                start = start_date.strftime(DATE_FORMAT),
+                end = end_date.strftime(DATE_FORMAT),
                 ))
     if not hours_string:
         hours_string = '0 8 8 8 8 8 0'
