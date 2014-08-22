@@ -3,41 +3,34 @@ Report Time Tool
 
 Installing 
 ------------
-Get the source::
+Installation::
 
     git clone https://github.com/edthedev/time_reporting.git
     cd time_reporting
+    ./setup.sh
 
-Create a virtual environment::
+To run the application::
 
-    sudo pip install virtualenv
-    virtualenv ENV
+    ./run.sh
+    # See below for command line options.
 
-Install the required libraries into the virtual environment::
+Updating
+---------
+You can use Git to update to the latest release::
 
-    source ENV/bin/activate
-    pip install -r requirements.txt
-
-User Installation::
-
-    git clone https://github.com/edthedev/time_reporting.git
     cd time_reporting
-    virtualenv ENV
-
-    pip install -r requirements.txt
-    ./report_time.py # See usage below.
+    git pull
 
 Using
 ------
 Running in command line interactive mode::
 
     cd time_reporting
-    source ENV/bin/activate
-    ./report_time.py
+    ./run.sh
 
 Full unix-style usage details:: 
 
-    report_time.py [--date=<date>] [--hours=<hours>] [--user=<username>] [--password-file=<password_file>] [--quiet] [--five-day]
+    ./run.sh [--date=<date>] [--hours=<hours>] [--user=<username>] [--password-file=<password_file>] [--quiet] [--five-day]
 
 Options::
 
