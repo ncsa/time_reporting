@@ -47,6 +47,9 @@ Automatic Import
 -----------------
 The ideal use for Time Reporter is to export data tracked in a live time tracking system, and submit it automatically.
 
+If your department uses the My.CITES Vacation/Sick Leave benefits system, there is a useful report at: 
+https://my.cites.illinois.edu/vacation/printreport.asp
+
 Example using Python to submit data for a single day::
 
     from report_time import TimeReportBrowser
