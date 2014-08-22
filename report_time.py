@@ -28,7 +28,6 @@ import getpass
 import logging
 import os
 import subprocess
-import sys
 
 # Dependencies
 import requests
@@ -76,9 +75,11 @@ class TimeReportBrowser(object):
         '''Log in to the webpage.'''
         tries = 0
         while not self.is_logged_in():
-            if not args['--quiet']: print "Logging in as %s..." % USERNAME
+            if not args['--quiet']: 
+                print "Logging in as %s..." % USERNAME
             if tries == 0 and _PASSWORD:
-                if not args['--quiet']: print "Using password from file."
+                if not args['--quiet']: 
+                    print "Using password from file."
                 pwd = _PASSWORD
             else:
                 pwd = getpass.getpass('Enterprise ID Password? ')
@@ -133,7 +134,8 @@ args = docopt.docopt(__doc__, version='1.0')
 FIVE_DAY = args['--five-day']
 
 USERNAME = getpass.getuser()
-if args['--user']: USERNAME = args['--user']
+if args['--user']: 
+    USERNAME = args['--user']
 
 _PASSWORD = None
 if args['--password-file']:
@@ -143,7 +145,8 @@ if args['--password-file']:
         print "  vim password.txt"
         print "  gpg -r email@example.com -e password.txt\n"
     _PASSWORD = subprocess.check_output('gpg -qd %s' % args['--password-file'], shell=True).replace('\n', '')
-    if not args['--quiet']: print "Loaded password from %s" % args['--password-file']
+    if not args['--quiet']: 
+        print "Loaded password from %s" % args['--password-file']
 
 def prompt_for_hours(date_string):
     '''Prompt the user for hours for a given week.'''
@@ -153,11 +156,12 @@ def prompt_for_hours(date_string):
 
     # Convert to five day week, if requested.
     if FIVE_DAY:
-        start_date = datetime.strptime(date_string, DATE_FORMAT) \
+        start_date = \
+            datetime.strptime(date_string, DATE_FORMAT) \
             + timedelta(days=1)
         date_string = start_date.strftime(DATE_FORMAT)
-
-        end_of_week = datetime.strptime(date_string, DATE_FORMAT) \
+        end_of_week = \
+            datetime.strptime(date_string, DATE_FORMAT) \
             + timedelta(days=4)
 
     choice = 'n'
@@ -223,7 +227,7 @@ def main():
     br = TimeReportBrowser()
     date_string = None
     hours = None
-    
+
     if args['--hours']:
         hours_string = args['--hours'] 
         if hours_string:
@@ -238,17 +242,20 @@ def main():
     # Submit time
     br.login()
     if "Edit" in br.result.content:
-        if not args['--quiet']: print "Time reporting for this week is up to date."
+        if not args['--quiet']: 
+            print "Time reporting for this week is up to date."
     else:
         if not hours:
             if not args['--quiet']:
                 hours = prompt_for_hours(date_string)
         outcome = br.submit(date_string, hours)
-        if not args['--quiet']: print outcome
+        if not args['--quiet']: 
+            print outcome
 
         # Review overdue time
     if not "Submission of time for the following week(s) is overdue." in br.result.content:
-        if not args['--quiet']: print "Time reporting is up to date."
+        if not args['--quiet']: 
+            print "Time reporting is up to date."
     else:
         content = br.result.content
         overdue = [x.strip() for x in content[content.find('id="pastDueWeek">'):content.find('</select>&nbsp;<input type="submit" id="getPastDueTimeEntryForm"')].split('\n') if x.strip()][1:]
@@ -266,7 +273,8 @@ def main():
             if not args['--quiet']:
                 hours = prompt_for_hours(day)
                 print br.submit(day, hours)
-        if not args['--quiet']: print "Time reporting is now up to date."
+        if not args['--quiet']: 
+            print "Time reporting is now up to date."
 
 if __name__ == "__main__":
     main()
