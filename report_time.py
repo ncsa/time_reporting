@@ -200,7 +200,7 @@ def validate_hours(hours_string):
 
         if FIVE_DAY:
             if len(hours) != 5:
-                print "Expected 7 values for Monday-Friday"
+                print "Expected 5 values for Monday-Friday"
                 return None
         else:
             if len(hours) != 7:
