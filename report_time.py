@@ -82,7 +82,8 @@ class TimeReportBrowser(object):
                     print "Using password from file."
                 pwd = _PASSWORD
             else:
-                pwd = getpass.getpass('Enterprise ID Password? ')
+                prompt = 'Username: {}, URL: {}, Password?'.format(USERNAME, LOGIN_URL)
+                pwd = getpass.getpass(prompt)
             self.result = self.session.post(LOGIN_URL, data={'inputEnterpriseId': USERNAME, 'password': pwd, 'queryString': 'null', 'BTN_LOGIN': 'Login'}, allow_redirects=True)
             tries += 1
 
@@ -195,6 +196,7 @@ def get_hours_from_string(hours_string):
 
 def validate_hours(hours_string):
     try:
+        hours_values = hours_values.strip()
         hours_values = hours_string.split(' ')
         hours = [float(value) for value in hours_values]
 
