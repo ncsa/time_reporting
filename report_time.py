@@ -172,6 +172,7 @@ def prompt_for_hours(date_string):
     choice = 'n'
     yep = ['', 'Y', 'y', 'yes', 'Yes']
 
+    print "" # Leave a little extra space to read.
     hours_string = raw_input(
             'Hours for the week starting on {start}, ending on {end}? '.format(
                 start = start_date.strftime(DATE_FORMAT),
