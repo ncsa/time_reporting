@@ -197,8 +197,7 @@ def get_hours_from_string(hours_string):
 
 def validate_hours(hours_string):
     try:
-        hours_values = hours_values.strip()
-        hours_values = hours_string.split(' ')
+        hours_values = hours_string.strip().split(' ')
         hours = [float(value) for value in hours_values]
 
         if FIVE_DAY:
