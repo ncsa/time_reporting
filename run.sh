@@ -1,2 +1,2 @@
 #/bin/bash
-./ENV/bin/python report_time.py "$@"
+./ENV/bin/python report_time.py "$@" --five-day
