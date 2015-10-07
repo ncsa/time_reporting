@@ -37,7 +37,6 @@ import requests
 import docopt
 
 URL         = "https://hrnet.uihr.uillinois.edu/PTRApplication/index.cfm"
-LOGIN_URL   = "https://eas.admin.uillinois.edu/eas/servlet/login.do"
 OVERDUE_URL = URL + "?fuseaction=TimesheetEntryForm&Overdue=true&"
 SUBMIT_URL  = URL + "?fuseaction=SubmitTimesheet" 
 DATE_FORMAT = '%m/%d/%Y'
@@ -63,10 +62,12 @@ class TimeReportBrowser(object):
     def __init__(self):
         self.session = requests.session()
         self.result = self.session.get(URL)
+        self.login_url = ""
     
     def is_logged_in(self):
         '''Check whether logged in'''
-        if "Enterprise Authentication Service" in self.result.content:
+        if "You must log in to continue" in self.result.content:
+            self.login_url = self.result.url
             return False
         else:
             return True
@@ -84,7 +85,7 @@ class TimeReportBrowser(object):
             else:
                 prompt = 'Username: {}, URL: {}, Password?'.format(USERNAME, LOGIN_URL)
                 pwd = getpass.getpass(prompt)
-            self.result = self.session.post(LOGIN_URL, data={'inputEnterpriseId': USERNAME, 'password': pwd, 'queryString': 'null', 'BTN_LOGIN': 'Login'}, allow_redirects=True)
+            self.result = self.session.post(self.login_url, data={'USER': USERNAME, 'PASSWORD': pwd, 'queryString': 'null', 'target': URL, 'BTN_LOGIN': 'Login'}, allow_redirects=True)
             tries += 1
 
     def submit(self, date_string=None, hours=None, silent = False):
@@ -145,7 +146,7 @@ if args['--password-file']:
         print "  gpg --gen-key"
         print "  vim password.txt"
         print "  gpg -r email@example.com -e password.txt\n"
-    _PASSWORD = subprocess.check_output('gpg -qd %s' % args['--password-file'], shell=True).replace('\n', '')
+    _PASSWORD = subprocess.check_output('gpg --no-tty -qd %s' % args['--password-file'], shell=True).replace('\n', '')
     if not args['--quiet']: 
         print "Loaded password from %s" % args['--password-file']
 
