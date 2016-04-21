@@ -28,6 +28,7 @@ import getpass
 import logging
 import os
 import subprocess
+import mechanize
 
 # Dependencies
 import requests
@@ -37,7 +38,9 @@ import requests
 import docopt
 
 URL         = "https://hrnet.uihr.uillinois.edu/PTRApplication/index.cfm"
-OVERDUE_URL = URL + "?fuseaction=TimesheetEntryForm&Overdue=true&"
+#LOGIN_URL   = "https://eas.admin.uillinois.edu/eas/servlet/login.do"
+LOGIN_URL   = "https://auth.uillinois.edu/siteminderagent/auth/MultiLogin/sm_login.fcc"
+OVERDUE_URL = URL + "?fuseaction=TimeSheetEntryForm&Overdue=true&"
 SUBMIT_URL  = URL + "?fuseaction=SubmitTimesheet" 
 DATE_FORMAT = '%m/%d/%Y'
 
@@ -60,39 +63,61 @@ _LOGGER.addHandler(ch)
 
 class TimeReportBrowser(object):
     def __init__(self):
-        self.session = requests.session()
-        self.result = self.session.get(URL)
-        self.login_url = ""
-    
+        self.session = mechanize.Browser()
+        self.result = self.session.open(URL)
+        #_LOGGER.info('Result: %s', self.result.read())
+
+    def result(self):
+        return self.result
+
+    def search_forms(self, form_name):
+        for form in self.session.forms():
+            if form.name == form_name:
+                return True
+         
+        return False
+
     def is_logged_in(self):
+        #_LOGGER.info('Result: %s', self.result.read())
         '''Check whether logged in'''
-        if "You must log in to continue" in self.result.content:
-            self.login_url = self.result.url
+#        if "Enterprise Authentication Service" in self.result.content:
+        if "You must log in to continue." in self.result.read():
             return False
         else:
             return True
 
-    def login(self):
+    def login(self, date_string=None):
+        # Go to the requested date.
+        if date_string is None:
+            date_string = get_recent_sunday()
         '''Log in to the webpage.'''
         tries = 0
         while not self.is_logged_in():
-            if not args['--quiet']: 
+            if not args['--quiet']:
                 print "Logging in as %s..." % USERNAME
             if tries == 0 and _PASSWORD:
-                if not args['--quiet']: 
+                if not args['--quiet']:
                     print "Using password from file."
                 pwd = _PASSWORD
             else:
                 prompt = 'Username: {}, URL: {}, Password?'.format(USERNAME, LOGIN_URL)
                 pwd = getpass.getpass(prompt)
-            self.result = self.session.post(self.login_url, data={'USER': USERNAME, 'PASSWORD': pwd, 'queryString': 'null', 'target': URL, 'BTN_LOGIN': 'Login'}, allow_redirects=True)
+            target_url = get_url_for_date(date_string)
+            
+            self.session.select_form("Login") # select the login form
+
+            self.session.form['USER'] = USERNAME # fill in the USER
+            self.session.form['PASSWORD'] = pwd # fill in the password
+            self.response = self.session.submit() # submit the completed form
+            _LOGGER.info("Response: %s", self.response.read())
+
             tries += 1
 
     def submit(self, date_string=None, hours=None, silent = False):
         '''Submit time worked during a chosen week.'''
 
         # Login
-        self.login()
+        self.login(date_string)
 
         # Go to the requested date.
         if date_string is None:
@@ -100,43 +125,78 @@ class TimeReportBrowser(object):
 
         # Fetch page for the chosen date.
         url = get_url_for_date(date_string)
-        self.result = self.session.get(url)
+        self.result = self.session.open(url)
+        _LOGGER.info("submit Response: %s", self.result.read())
+
+        # select form
+        self.session.select_form("frmTimesheet")
+
+        for control in self.session.form.controls:
+            _LOGGER.info('Control: %s', control)
+            _LOGGER.info( "type=%s, name=%s value=%s" % (control.type, control.name, self.session[control.name]))
 
         # Implicitly convert 5 day week into 7 day week.
-        if len(hours) == 5: 
+        if len(hours) == 5:
             hours.insert(0, 0)
             hours.append(0)
 
         if len(hours) != 7:
             raise ValueError("Incorrect number of values for the week.")
+        month, day, year = [int(x) for x in date_string.split('/')]
         d = {}
         days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
         total = 0
+        formfields = ''
         for i in range(len(days)):
-            d[days[i] + "TimesheetHourValue"] = int(hours[i])
+            self.session.form[days[i] + "TimesheetHourValue"] = str(int(hours[i]))
+            formfields = formfields + days[i] + "TimesheetHourValue,"
             total += int(hours[i]) * 60
             minutes = hours[i] % 1
             if minutes not in [0.0, 0.25, 0.5, 0.75]:
                 raise ValueError("Please only use hours rounded to the nearest quarter-hour.")
-            d[days[i] + "TimesheetMinuteValue"] = minutes
+            mins = str(minutes)
+            if mins == "0.0":
+                mins = "0.00"
+            if mins == "0.5":
+                mins = "0.50"
+            self.session.form[days[i] + "TimesheetMinuteValue"] = [mins]
+            formfields = formfields + days[i] + "TimesheetMinuteValue,"
             total += minutes
-        d['weekTotalHours'] = int(total/60)
-        d['weekTotalMinutes'] = total % 60
-        self.result = self.session.post(SUBMIT_URL, data=d, allow_redirects=True)
-        _LOGGER.info('Result: %s', self.result)
-        _LOGGER.info('Content: %s', self.result.content)
-        if "You have successfully submitted" in self.result.content:
+            formfields = formfields + "weekTotalHours," + "weekTotalMinutes"
+
+        # set totals fields writable, and then set values
+        self.session.form.find_control('WeekTotalHours').readonly = False
+        self.session.form['WeekTotalHours'] = str(int(total/60))
+        self.session.form.find_control('WeekTotalMinutes').readonly = False
+        self.session.form['WeekTotalMinutes'] = str(total % 60)
+ 
+        # disable btnSave and ensure btnSubmit is set
+        self.session.form.find_control('btnSave').disabled = True
+        self.session.form['btnSubmit'] = "Submit"
+
+        # create submit coord fields and run fixup to add them
+        # don't know if we need these
+        self.session.form.new_control('text', 'btnSubmit.x',{'value':'32'})
+        self.session.form.new_control('text', 'btnSubmit.y',{'value':'10'})
+        self.session.form.fixup()
+
+        _LOGGER.info("formstuff: %s", self.session.form)
+        #submit the completed form
+        self.result = self.session.submit()
+        _LOGGER.info("Result: %s", self.result.read())
+        if "You have successfully submitted" in self.result.read():
             return "Successfully submitted %s for %s." % (str(hours), date_string)
         else:
             return "Unable to submit %s for %s. " % (str(hours), date_string) + \
-                    "Have you already submitted this date?" 
+                    "Have you already submitted this date?"
+
 
 args = docopt.docopt(__doc__, version='1.0')
 
 FIVE_DAY = args['--five-day']
 
 USERNAME = getpass.getuser()
-if args['--user']: 
+if args['--user']:
     USERNAME = args['--user']
 
 _PASSWORD = None
@@ -147,7 +207,7 @@ if args['--password-file']:
         print "  vim password.txt"
         print "  gpg -r email@example.com -e password.txt\n"
     _PASSWORD = subprocess.check_output('gpg --no-tty -qd %s' % args['--password-file'], shell=True).replace('\n', '')
-    if not args['--quiet']: 
+    if not args['--quiet']:
         print "Loaded password from %s" % args['--password-file']
 
 def prompt_for_hours(date_string):
@@ -155,7 +215,7 @@ def prompt_for_hours(date_string):
 
     # Start date.
     start_date = \
-        datetime.strptime(date_string, DATE_FORMAT) 
+        datetime.strptime(date_string, DATE_FORMAT)
 
     # As a courtesy, show end date as well. (Saturday)
     end_date = \
@@ -215,7 +275,7 @@ def validate_hours(hours_string):
         print "Error: Invalid hours provided."
         print "All values must be numbers in float format."
         print __doc__
-        return None 
+        return None
 
 def get_url_for_date(date_string):
     month, day, year = [int(x) for x in date_string.split('/')]
@@ -224,7 +284,7 @@ def get_url_for_date(date_string):
     return url
 
 def get_recent_sunday():
-    day = datetime.now() 
+    day = datetime.now()
     while day.strftime('%A') != 'Sunday':
         day = day - timedelta(days=1)
     return day.strftime(DATE_FORMAT)
@@ -236,7 +296,7 @@ def main():
     hours = None
 
     if args['--hours']:
-        hours_string = args['--hours'] 
+        hours_string = args['--hours']
         if hours_string:
             hours = validate_hours(hours_string)
     # FIXME - Default is string not array.
@@ -247,24 +307,24 @@ def main():
         date_string = get_recent_sunday()
 
     # Submit time
-    br.login()
-    if "Edit" in br.result.content:
-        if not args['--quiet']: 
+    br.login(date_string)
+    if br.search_forms("frmRetractTimesheet"):
+        if not args['--quiet']:
             print "Time reporting for this week is up to date."
     else:
         if not hours:
             if not args['--quiet']:
                 hours = prompt_for_hours(date_string)
         outcome = br.submit(date_string, hours)
-        if not args['--quiet']: 
+        if not args['--quiet']:
             print outcome
 
-        # Review overdue time
-    if not "Submission of time for the following week(s) is overdue." in br.result.content:
-        if not args['--quiet']: 
+    # Review overdue time
+    if not "Submission of time for the following week(s) is overdue." in br.result.read():
+        if not args['--quiet']:
             print "Time reporting is up to date."
     else:
-        content = br.result.content
+        content = br.result.read()
         overdue = [x.strip() for x in content[content.find('id="pastDueWeek">'):content.find('</select>&nbsp;<input type="submit" id="getPastDueTimeEntryForm"')].split('\n') if x.strip()][1:]
         overdue = [x[x.find('month='):x.find('">')] for x in overdue]
         overdue = [x[x.find('Week=')+5:] for x in overdue]
@@ -280,8 +340,9 @@ def main():
             if not args['--quiet']:
                 hours = prompt_for_hours(day)
                 print br.submit(day, hours)
-        if not args['--quiet']: 
+        if not args['--quiet']:
             print "Time reporting is now up to date."
+
 
 if __name__ == "__main__":
     main()
