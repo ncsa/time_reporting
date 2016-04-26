@@ -28,10 +28,10 @@ import getpass
 import logging
 import os
 import subprocess
-import mechanize
 
 # Dependencies
-import requests
+#import requests
+import mechanize
 
 # Included
 # from doctopt import docopt
@@ -40,7 +40,7 @@ import docopt
 URL         = "https://hrnet.uihr.uillinois.edu/PTRApplication/index.cfm"
 #LOGIN_URL   = "https://eas.admin.uillinois.edu/eas/servlet/login.do"
 LOGIN_URL   = "https://auth.uillinois.edu/siteminderagent/auth/MultiLogin/sm_login.fcc"
-OVERDUE_URL = URL + "?fuseaction=TimeSheetEntryForm&Overdue=true&"
+OVERDUE_URL = URL + "?fuseaction=TimeSheetEntryForm&Overdue=false&"
 SUBMIT_URL  = URL + "?fuseaction=SubmitTimesheet" 
 DATE_FORMAT = '%m/%d/%Y'
 
@@ -67,8 +67,13 @@ class TimeReportBrowser(object):
         self.result = self.session.open(URL)
         #_LOGGER.info('Result: %s', self.result.read())
 
-    def result(self):
+    def resp(self):
+        _LOGGER.info("resp func: %s",self.result.read)
         return self.result
+
+    def open_url(self, url):
+        self.result = self.session.open(url)
+        return
 
     def search_forms(self, form_name):
         for form in self.session.forms():
@@ -100,16 +105,18 @@ class TimeReportBrowser(object):
                     print "Using password from file."
                 pwd = _PASSWORD
             else:
-                prompt = 'Username: {}, URL: {}, Password?'.format(USERNAME, LOGIN_URL)
+                prompt = 'Username: {}, URL: {}, Password?'.format(USERNAME, URL)
                 pwd = getpass.getpass(prompt)
             target_url = get_url_for_date(date_string)
-            
+            _LOGGER.info("URL: %s", target_url)
+            self.result = self.session.open(target_url)
+            _LOGGER.info("login Response: %s", self.result.read())
             self.session.select_form("Login") # select the login form
 
             self.session.form['USER'] = USERNAME # fill in the USER
             self.session.form['PASSWORD'] = pwd # fill in the password
-            self.response = self.session.submit() # submit the completed form
-            _LOGGER.info("Response: %s", self.response.read())
+            self.result = self.session.submit() # submit the completed form
+            _LOGGER.info("Response: %s", self.result.read())
 
             tries += 1
 
@@ -308,6 +315,9 @@ def main():
 
     # Submit time
     br.login(date_string)
+    url = get_url_for_date(date_string)
+    br.open_url(url)
+    _LOGGER.info("pre submit: %s", br.result.read())
     if br.search_forms("frmRetractTimesheet"):
         if not args['--quiet']:
             print "Time reporting for this week is up to date."
@@ -320,6 +330,7 @@ def main():
             print outcome
 
     # Review overdue time
+    content = br.result.read()
     if not "Submission of time for the following week(s) is overdue." in br.result.read():
         if not args['--quiet']:
             print "Time reporting is up to date."
