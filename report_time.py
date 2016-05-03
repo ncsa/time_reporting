@@ -8,7 +8,7 @@ This library can be particularly effective if used to process exported data from
 The default configuration supports the University of Illinois time reporting web interface.
 
 Usage:
-    report_time [--date=<date>] [--hours=<hours>] [--user=<username>] [--password-file=<password_file>] [--quiet] [--five-day]
+    report_time [--date=<date>] [--hours=<hours>] [--user=<username>] [--password-file=<password_file>] [--quiet] [--five-day] [--edit]
 
 Options:
     -h --hours=<hours>  7 numbers, hours worked on Sunday - Saturday i.e. '0 8 8 8 8 8 0'
@@ -16,6 +16,7 @@ Options:
     -d --date=<date>  Submit report for date other than the current due report.
         (Example: 01/21/1999)
     -f --five-day   assume a five day work week
+    -e --edit   Edit timesheet if already submitted
     -u --user=<username>  The username to login as.
     -p --password-file=<password_file>  A GPG Encrypted file the contents of which are your password.
     -q --quiet  Suppress all output other than errors.
@@ -67,12 +68,36 @@ class TimeReportBrowser(object):
         self.result = self.session.open(URL)
         #_LOGGER.info('Result: %s', self.result.read())
 
-    def resp(self):
-        _LOGGER.info("resp func: %s",self.result.read)
-        return self.result
-
     def open_url(self, url):
         self.result = self.session.open(url)
+        return
+
+    def load_date(self, date_string):
+        self.login(date_string)
+        self.session.open(URL)
+        new_date = get_sunday_for_date(date_string)
+        month, day, year = [int(x) for x in new_date.split('/')]
+        link_match = "month=" + str(month)
+        found = False
+        for link in self.session.links():
+            _LOGGER.info("loadurl: %s", link.url)
+            if link_match in link.url:
+                found = True
+                self.result = self.session.follow_link(link)
+                break
+        
+        self.session.select_form("weekDropDownForm")
+        self.session.form['selectedWeek'] = [new_date]
+        self.result = self.session.submit()
+        #_LOGGER.info("inload: %s", self.result.read())
+        return found
+
+    def load_edit(self, date_string):
+        self.login(date_string)
+        self.session.open(URL)
+        new_date = get_sunday_for_date(date_string)
+        self.session.select_form("frmRetractTimesheet")
+        self.result = self.session.submit()
         return
 
     def search_forms(self, form_name):
@@ -132,11 +157,18 @@ class TimeReportBrowser(object):
 
         # Fetch page for the chosen date.
         url = get_url_for_date(date_string)
-        self.result = self.session.open(url)
+        self.result= self.session.open(url)
         _LOGGER.info("submit Response: %s", self.result.read())
 
         # select form
-        self.session.select_form("frmTimesheet")
+        if self.search_forms("frmTimesheet"):
+            self.session.select_form("frmTimesheet")
+        elif self.search_forms("frmRetractTimesheet") and args['--edit']:
+            self.load_edit(date_string)
+            self.session.select_form("frmTimesheet")
+        else:
+            print "Error no forms"
+            return 0
 
         for control in self.session.form.controls:
             _LOGGER.info('Control: %s', control)
@@ -190,8 +222,9 @@ class TimeReportBrowser(object):
         _LOGGER.info("formstuff: %s", self.session.form)
         #submit the completed form
         self.result = self.session.submit()
-        _LOGGER.info("Result: %s", self.result.read())
-        if "You have successfully submitted" in self.result.read():
+        content = self.result.read()
+        _LOGGER.info("Result: %s", content)
+        if "You have successfully submitted" in content:
             return "Successfully submitted %s for %s." % (str(hours), date_string)
         else:
             return "Unable to submit %s for %s. " % (str(hours), date_string) + \
@@ -296,6 +329,13 @@ def get_recent_sunday():
         day = day - timedelta(days=1)
     return day.strftime(DATE_FORMAT)
 
+def get_sunday_for_date(date_string):
+    month, day, year = [int(x) for x in date_string.split('/')]
+    day = date(year, month, day)
+    while day.strftime('%A') != 'Sunday':
+        day = day - timedelta(days=1)
+    return day.strftime(DATE_FORMAT)
+
 def main():
 
     br = TimeReportBrowser()
@@ -316,10 +356,23 @@ def main():
     # Submit time
     br.login(date_string)
     url = get_url_for_date(date_string)
+    # no matter the date, this will error out, but gets us the links
     br.open_url(url)
-    _LOGGER.info("pre submit: %s", br.result.read())
-    if br.search_forms("frmRetractTimesheet"):
-        if not args['--quiet']:
+    # based on the date find the appropriate link, follow it and then select week
+    loaded = br.load_date(date_string)
+    if not loaded:
+        print "Unable to load requested week."
+        _LOGGER.info("Unable to load: %s", br.result.read())
+      
+    if br.search_forms("frmRetractTimesheet"): #already loaded a submitted timesheet
+        if args['--edit']:
+            if not hours:
+                if not args['--quiet']:
+                    hours = prompt_for_hours(date_string)
+            outcome = br.submit(date_string, hours)
+            if not args['--quiet']:
+                print outcome
+        elif not args['--quiet']:
             print "Time reporting for this week is up to date."
     else:
         if not hours:
@@ -331,11 +384,11 @@ def main():
 
     # Review overdue time
     content = br.result.read()
-    if not "Submission of time for the following week(s) is overdue." in br.result.read():
+    if not "Submission of time for the following week(s) is overdue." in content:
         if not args['--quiet']:
             print "Time reporting is up to date."
     else:
-        content = br.result.read()
+        #content = br.result.read()
         overdue = [x.strip() for x in content[content.find('id="pastDueWeek">'):content.find('</select>&nbsp;<input type="submit" id="getPastDueTimeEntryForm"')].split('\n') if x.strip()][1:]
         overdue = [x[x.find('month='):x.find('">')] for x in overdue]
         overdue = [x[x.find('Week=')+5:] for x in overdue]
