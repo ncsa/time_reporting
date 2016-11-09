@@ -7,4 +7,4 @@ This first version is still very basic and is missing some of the functionality
 of the old tool (such as gpg encrypted password).
 
 ## Usage
-See 
+See [ptr.py](ptr.py)
