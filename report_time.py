@@ -1,48 +1,13 @@
 #!/usr/bin/env python2
-"""SOEEA Time Reporting Tool
-
-Allows reports to be submitted from a command line interface. 
-
-This library can be particularly effective if used to process exported data from a time tracking application.
-
-The default configuration supports the University of Illinois time reporting web interface.
-
-Usage:
-    report_time [--date=<date>] [--hours=<hours>] [--user=<username>] [--password-file=<password_file>] [--quiet] [--five-day] [--edit]
-
-Options:
-    -h --hours=<hours>  7 numbers, hours worked on Sunday - Saturday i.e. '0 8 8 8 8 8 0'
-        (Default assumes 40 hour work week M-F)
-    -d --date=<date>  Submit report for date other than the current due report.
-        (Example: 01/21/1999)
-    -f --five-day   assume a five day work week
-    -e --edit   Edit timesheet if already submitted
-    -u --user=<username>  The username to login as.
-    -p --password-file=<password_file>  A GPG Encrypted file the contents of which are your password.
-    -q --quiet  Suppress all output other than errors.
-"""
-
 
 # Python native
-from datetime import datetime, timedelta, date
-import getpass
+import datetime
 import logging
-import os
-import subprocess
+import pprint
 
 # Dependencies
-#import requests
 import mechanize
 
-# Included
-# from doctopt import docopt
-import docopt
-
-URL         = "https://hrnet.uihr.uillinois.edu/PTRApplication/index.cfm"
-#LOGIN_URL   = "https://eas.admin.uillinois.edu/eas/servlet/login.do"
-LOGIN_URL   = "https://auth.uillinois.edu/siteminderagent/auth/MultiLogin/sm_login.fcc"
-OVERDUE_URL = URL + "?fuseaction=TimeSheetEntryForm&Overdue=false&"
-SUBMIT_URL  = URL + "?fuseaction=SubmitTimesheet" 
 DATE_FORMAT = '%m/%d/%Y'
 
 # _LOGGER
@@ -63,145 +28,186 @@ _LOGGER.addHandler(fh)
 _LOGGER.addHandler(ch)
 
 class TimeReportBrowser(object):
-    def __init__(self):
+    URL = "https://hrnet.uihr.uillinois.edu/PTRApplication/index.cfm"
+    FORM_NAME_OVERDUE_WEEKS = 'frmPastDueTimesheet'
+
+    def __init__( self, username, password, *a, **k ):
+        #user provided attrs
+        self.passwd = password
+        self.user   = username
+        self.quiet = None
+        for x in [ 'quiet' ]:
+            if x in k:
+                setattr( self, x, k[x] )
+        #internal attrs
+        self.result = None
         self.session = mechanize.Browser()
-        self.result = self.session.open(URL)
-        #_LOGGER.info('Result: %s', self.result.read())
+        self.logged_in = None
+        # TODO: need a better way to update last_page (needs to be updated for EVERY open and submit
+        # TODO: maybe overload seesion.open and session.submit
+        self.last_page = None
 
-    def open_url(self, url):
-        self.result = self.session.open(url)
-        return
 
-    def load_date(self, date_string):
-        self.login(date_string)
-        self.session.open(URL)
-        new_date = get_sunday_for_date(date_string)
-        month, day, year = [int(x) for x in new_date.split('/')]
-        link_match = "month=" + str(month)
-        found = False
+    # OVERLOAD session.open() AND session.submit() SO THAT LAST PAGE LOADED
+    # IS ALWAYS TRACKED. THIS ALLOWS A SIMPLE FORM OF LAZY LOADING AND SHOULD HELP
+    # PREVENT MULTIPLE RELOADS OF THE SAME PAGE.
+    def _open_url( self, url, last_page=None ):
+        self.result = self.session.open( url )
+        self.last_page = last_page
+
+
+    def _submit_form( self, last_page=None ):
+        self.result = self.session.submit()
+        self.last_page = last_page
+
+
+    def _login( self ):
+        ''' INTERNAL ONLY
+            Log in to the site.
+        '''
+        if self.logged_in:
+            return
+        self._open_url( self.URL )
+        _LOGGER.debug("HTML Login Form: %s", self.result.read())
+        self.session.select_form("Login") # select the login form
+        self.session.form['USER'] = self.user # fill in the USER
+        self.session.form['PASSWORD'] = self.passwd # fill in the password
+        self._submit_form( last_page='LOGIN' ) # submit the completed form
+        _LOGGER.debug("HTML Login Result: %s", self.result.read())
+        # check for login success
+        if self.result:
+            if "You must log in to continue." in self.result.read():
+                raise UserWarning( "Login Failed" )
+        else:
+            raise UserWarning( "Bad Login Page" )
+        self.logged_in = True
+
+
+
+    def get_overdue_weeks( self ):
+        ''' returns dict with key = date in MM/DD/YYYY format
+            and value = actual value (ie: month=5&selectedWeek=05/01/2016&CurrentWkYear=2016 )
+        '''
+        self._load_base()
+        items = {}
+        if self._search_forms( self.FORM_NAME_OVERDUE_WEEKS ):
+            self.session.select_form( self.FORM_NAME_OVERDUE_WEEKS )
+            select = self.session.form.find_control( "pastDueWeek" )
+            for item in select.items:
+                #_LOGGER.debug( "ITEM: {0}".format( item.attrs ) )
+                items[ item.attrs['contents'] ] = item.attrs['value']
+        else:
+            _LOGGER.debug( "Overdue Timesheets form not found" )
+        _LOGGER.debug( "get_overdue_weeks: returning items: {0}".format( pprint.pformat( items ) ) )
+        # TODO: do we need to unselect the overdue weeks form?
+        return items
+
+
+
+    def _load_base( self ):
+        ''' Load base page that has links for each month of this year
+            as well as the selection (pull-down) list of overdue weeks
+            and the selection list of weeks for the current month
+        '''
+        self._login()
+        # Don't need to load base if last action was login
+        if self.last_page in [ 'BASE', 'LOGIN' ]:
+            return
+        # no matter the date, this will error out, but gets us the links
+        self._open_url( self.URL, last_page='BASE' )
+        _LOGGER.debug( "HTML Load Base Result:\n{0}".format( self.result.read() ) )
+
+
+    def _load_date( self, date ):
+        ''' Load the html page for a data that has NOT YET BEEN SUBMITTED.
+            Use load_edit() for loading a date that was already submitted once.
+            Use get_overdue_weeks() to tell the difference.
+        '''
+        self._load_base()
+        sunday = self._get_sunday_for_date( date )
+        sunday_str = sunday.strftime( DATE_FORMAT )
+        link_match = "month=" + str( sunday.month )
         for link in self.session.links():
-            _LOGGER.info("loadurl: %s", link.url)
+            _LOGGER.debug("load_date: found link: {0}".format( link.url ) )
             if link_match in link.url:
-                found = True
                 self.result = self.session.follow_link(link)
+                _LOGGER.debug( "HTML load_date: link result: {0}".format( self.result.read() ) )
                 break
-        
         self.session.select_form("weekDropDownForm")
-        self.session.form['selectedWeek'] = [new_date]
-        self.result = self.session.submit()
-        #_LOGGER.info("inload: %s", self.result.read())
-        return found
+        self.session.form['selectedWeek'] = [ sunday_str ]
+        self._submit_form( last_page='DATE' )
+        result = self.result.read()
+        _LOGGER.debug( "HTML Load Date Final: {0}".format( result ) )
+        if 'Enter time for the week starting {0}'.format( sunday_str ) not in result:
+            self.last_page = None
+            raise UserWarning( "failed to load date '{0}'".format( sunday_str ) )
 
-    def load_edit(self, date_string):
-        self.login(date_string)
-        self.session.open(URL)
-        new_date = get_sunday_for_date(date_string)
-        self.session.select_form("frmRetractTimesheet")
-        self.result = self.session.submit()
-        return
 
-    def search_forms(self, form_name):
+#    def load_edit(self, date_string):
+#        self._login(date_string)
+#        self.session.open(URL)
+#        new_date = _get_sunday_for_date(date_string)
+#        self.session.select_form("frmRetractTimesheet")
+#        self.result = self.session.submit()
+#        return
+
+    def _search_forms(self, form_name):
+        rv = False
         for form in self.session.forms():
+            _LOGGER.debug( "search_forms: found '{0}'".format( form.name ) )
             if form.name == form_name:
-                return True
-         
-        return False
+                rv = True
+                break
+        return rv
 
-    def is_logged_in(self):
-        #_LOGGER.info('Result: %s', self.result.read())
-        '''Check whether logged in'''
-#        if "Enterprise Authentication Service" in self.result.content:
-        if "You must log in to continue." in self.result.read():
-            return False
-        else:
-            return True
 
-    def login(self, date_string=None):
-        # Go to the requested date.
-        if date_string is None:
-            date_string = get_recent_sunday()
-        '''Log in to the webpage.'''
-        tries = 0
-        while not self.is_logged_in():
-            if not args['--quiet']:
-                print "Logging in as %s..." % USERNAME
-            if tries == 0 and _PASSWORD:
-                if not args['--quiet']:
-                    print "Using password from file."
-                pwd = _PASSWORD
-            else:
-                prompt = 'Username: {}, URL: {}, Password?'.format(USERNAME, URL)
-                pwd = getpass.getpass(prompt)
-            target_url = get_url_for_date(date_string)
-            _LOGGER.info("URL: %s", target_url)
-            self.result = self.session.open(target_url)
-            _LOGGER.info("login Response: %s", self.result.read())
-            self.session.select_form("Login") # select the login form
-
-            self.session.form['USER'] = USERNAME # fill in the USER
-            self.session.form['PASSWORD'] = pwd # fill in the password
-            self.result = self.session.submit() # submit the completed form
-            _LOGGER.info("Response: %s", self.result.read())
-
-            tries += 1
-
-    def submit(self, date_string=None, hours=None, silent = False):
-        '''Submit time worked during a chosen week.'''
-
-        # Login
-        self.login(date_string)
-
-        # Go to the requested date.
-        if date_string is None:
-            date_string = get_recent_sunday()
-
-        # Fetch page for the chosen date.
-        url = get_url_for_date(date_string)
-        self.result= self.session.open(url)
-        _LOGGER.info("submit Response: %s", self.result.read())
-
-        # select form
-        if self.search_forms("frmTimesheet"):
-            self.session.select_form("frmTimesheet")
-        elif self.search_forms("frmRetractTimesheet") and args['--edit']:
-            self.load_edit(date_string)
-            self.session.select_form("frmTimesheet")
-        else:
-            print "Error no forms"
-            return 0
-
-        for control in self.session.form.controls:
-            _LOGGER.info('Control: %s', control)
-            _LOGGER.info( "type=%s, name=%s value=%s" % (control.type, control.name, self.session[control.name]))
+    def submit( self, date, hours ):
+        ''' Submit time worked during for the week containing the specified date.
+            Date should be a Python date or datetime object
+            Hours should be a Python list object
+            The date must be an unsubmitted week (use edit_date for re-submitting)
+        '''
+        # TODO - validate date
 
         # Implicitly convert 5 day week into 7 day week.
-        if len(hours) == 5:
+        if len( hours ) == 5:
             hours.insert(0, 0)
             hours.append(0)
+        if len( hours ) != 7 :
+            raise UserWarning( "Expected either 5 or 7 hour values, got '{0}'".format( len( hours ) ) )
 
-        if len(hours) != 7:
-            raise ValueError("Incorrect number of values for the week.")
-        month, day, year = [int(x) for x in date_string.split('/')]
-        d = {}
+        # Get correct page
+        self._load_date( date )
+
+        # select form
+        if not self._search_forms("frmTimesheet"):
+            raise UserWarning( "Timesheet form not found in webpage" )
+        self.session.select_form("frmTimesheet")
+
+        for control in self.session.form.controls:
+            _LOGGER.debug( 'Control: {0}'.format( control ) )
+            _LOGGER.debug( "type={0}, name={1} value={2}".format( control.type, control.name, self.session[control.name] ) )
+
         days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
         total = 0
-        formfields = ''
         for i in range(len(days)):
-            self.session.form[days[i] + "TimesheetHourValue"] = str(int(hours[i]))
-            formfields = formfields + days[i] + "TimesheetHourValue,"
+            formkey = days[i] + "TimesheetHourValue"
+            hrs = int( hours[i] )
+            _LOGGER.debug( "Attempt to set form item '{0}' to '{1}'".format( formkey, hrs ) )
+            self.session.form[ formkey ] = str( hrs )
             total += int(hours[i]) * 60
-            minutes = hours[i] % 1
+            minutes = float( hours[i] % 1 )
             if minutes not in [0.0, 0.25, 0.5, 0.75]:
                 raise ValueError("Please only use hours rounded to the nearest quarter-hour.")
-            mins = str(minutes)
+            mins = str( minutes )
             if mins == "0.0":
                 mins = "0.00"
             if mins == "0.5":
                 mins = "0.50"
+            formkey = days[i] + "TimesheetMinuteValue"
+            _LOGGER.debug( "Attempt to set form item '{0}' to '{1}'".format( formkey, mins ) )
             self.session.form[days[i] + "TimesheetMinuteValue"] = [mins]
-            formfields = formfields + days[i] + "TimesheetMinuteValue,"
             total += minutes
-            formfields = formfields + "weekTotalHours," + "weekTotalMinutes"
 
         # set totals fields writable, and then set values
         self.session.form.find_control('WeekTotalHours').readonly = False
@@ -219,194 +225,37 @@ class TimeReportBrowser(object):
         self.session.form.new_control('text', 'btnSubmit.y',{'value':'10'})
         self.session.form.fixup()
 
-        _LOGGER.info("formstuff: %s", self.session.form)
+        _LOGGER.debug("formstuff: {0}".format( self.session.form ) )
         #submit the completed form
         self.result = self.session.submit()
         content = self.result.read()
-        _LOGGER.info("Result: %s", content)
-        if "You have successfully submitted" in content:
-            return "Successfully submitted %s for %s." % (str(hours), date_string)
-        else:
-            return "Unable to submit %s for %s. " % (str(hours), date_string) + \
-                    "Have you already submitted this date?"
+        _LOGGER.debug("Submit Result: {0}".format( content ) )
+        if "You have successfully submitted" not in content:
+            raise UserWarning( "Error submitting hours '{0}' for date '{1}'".format( hours, date ) )
+        _LOGGER.info( "Successfully submitted hours '{0}' for date '{1}'.".format( hours, date ) )
 
 
-args = docopt.docopt(__doc__, version='1.0')
+#    def get_url_for_date( self, the_date ):
+#        ''' Return the URL that will load the page containing the given date.
+#            NOTE: SOEEA defines weeks starting with Sunday, so URL will usually not
+#            include the specified date, but rather, the date of the Sunday prior to
+#            the specified date.
+#        '''
+#        OVERDUE_URL = self.URL + "?fuseaction=TimeSheetEntryForm&Overdue=false&"
+#        date_string = self._get_sunday_for_date( the_date ).strftime( DATE_FORMAT )
+#        url = OVERDUE_URL + "month=" + str(the_date.month) + "&selectedWeek=" + date_string
+#        return url
 
-FIVE_DAY = args['--five-day']
 
-USERNAME = getpass.getuser()
-if args['--user']:
-    USERNAME = args['--user']
-
-_PASSWORD = None
-if args['--password-file']:
-    if not os.path.isfile(args['--password-file']):
-        print "To create a password file, run:"
-        print "  gpg --gen-key"
-        print "  vim password.txt"
-        print "  gpg -r email@example.com -e password.txt\n"
-    _PASSWORD = subprocess.check_output('gpg --no-tty -qd %s' % args['--password-file'], shell=True).replace('\n', '')
-    if not args['--quiet']:
-        print "Loaded password from %s" % args['--password-file']
-
-def prompt_for_hours(date_string):
-    '''Prompt the user for hours for a given week.'''
-
-    # Start date.
-    start_date = \
-        datetime.strptime(date_string, DATE_FORMAT)
-
-    # As a courtesy, show end date as well. (Saturday)
-    end_date = \
-        datetime.strptime(date_string, DATE_FORMAT) \
-        + timedelta(days=6)
-
-    # Convert to five day week, if requested.
-    if FIVE_DAY:
-        # For Five day mode, show Monday, not Sunday.
-        date_string = start_date.strftime(DATE_FORMAT)
-        start_date += timedelta(days=1)
-        # For five day mode, show Friday, not Saturday.
-        end_date -= timedelta(days=1)
-
-    choice = 'n'
-    yep = ['', 'Y', 'y', 'yes', 'Yes']
-
-    print "" # Leave a little extra space to read.
-    hours_string = raw_input(
-            'Hours for the week starting on {start}, ending on {end}? '.format(
-                start = start_date.strftime(DATE_FORMAT),
-                end = end_date.strftime(DATE_FORMAT),
-                ))
-    if not hours_string:
-        hours_string = '0 8 8 8 8 8 0'
-        if FIVE_DAY:
-            hours_string = '8 8 8 8 8'
-
-    hours = validate_hours(hours_string)
-
-    choice = raw_input('Submit ' + str(hours) + ' for the week starting on ' + date_string + \
-        '? [Y/n]')
-    if not choice in yep:
-        hours = prompt_for_hours(date_string)
-
-    return hours
-
-def get_hours_from_string(hours_string):
-    return validate_hours(hours_string.split(' '))
-
-def validate_hours(hours_string):
-    try:
-        hours_values = hours_string.strip().split(' ')
-        hours = [float(value) for value in hours_values]
-
-        if FIVE_DAY:
-            if len(hours) != 5:
-                print "Expected 5 values for Monday-Friday"
-                return None
-        else:
-            if len(hours) != 7:
-                print "Expected 7 values for Sunday-Saturday"
-                return None
-
-        return hours
-    except ValueError:
-        print "Error: Invalid hours provided."
-        print "All values must be numbers in float format."
-        print __doc__
-        return None
-
-def get_url_for_date(date_string):
-    month, day, year = [int(x) for x in date_string.split('/')]
-    the_date = date(year, month, day)
-    url = OVERDUE_URL + "month=" + str(the_date.month) + "&selectedWeek=" + date_string
-    return url
-
-def get_recent_sunday():
-    day = datetime.now()
-    while day.strftime('%A') != 'Sunday':
-        day = day - timedelta(days=1)
-    return day.strftime(DATE_FORMAT)
-
-def get_sunday_for_date(date_string):
-    month, day, year = [int(x) for x in date_string.split('/')]
-    day = date(year, month, day)
-    while day.strftime('%A') != 'Sunday':
-        day = day - timedelta(days=1)
-    return day.strftime(DATE_FORMAT)
-
-def main():
-
-    br = TimeReportBrowser()
-    date_string = None
-    hours = None
-
-    if args['--hours']:
-        hours_string = args['--hours']
-        if hours_string:
-            hours = validate_hours(hours_string)
-    # FIXME - Default is string not array.
-    if args['--date']:
-        date_string = args['--date']
-
-    if not date_string:
-        date_string = get_recent_sunday()
-
-    # Submit time
-    br.login(date_string)
-    url = get_url_for_date(date_string)
-    # no matter the date, this will error out, but gets us the links
-    br.open_url(url)
-    # based on the date find the appropriate link, follow it and then select week
-    loaded = br.load_date(date_string)
-    if not loaded:
-        print "Unable to load requested week."
-        _LOGGER.info("Unable to load: %s", br.result.read())
-      
-    if br.search_forms("frmRetractTimesheet"): #already loaded a submitted timesheet
-        if args['--edit']:
-            if not hours:
-                if not args['--quiet']:
-                    hours = prompt_for_hours(date_string)
-            outcome = br.submit(date_string, hours)
-            if not args['--quiet']:
-                print outcome
-        elif not args['--quiet']:
-            print "Time reporting for this week is up to date."
-    else:
-        if not hours:
-            if not args['--quiet']:
-                hours = prompt_for_hours(date_string)
-        outcome = br.submit(date_string, hours)
-        if not args['--quiet']:
-            print outcome
-
-    # Review overdue time
-    content = br.result.read()
-    if not "Submission of time for the following week(s) is overdue." in content:
-        if not args['--quiet']:
-            print "Time reporting is up to date."
-    else:
-        #content = br.result.read()
-        overdue = [x.strip() for x in content[content.find('id="pastDueWeek">'):content.find('</select>&nbsp;<input type="submit" id="getPastDueTimeEntryForm"')].split('\n') if x.strip()][1:]
-        overdue = [x[x.find('month='):x.find('">')] for x in overdue]
-        overdue = [x[x.find('Week=')+5:] for x in overdue]
-# Strip out additional cruft.
-        overdue = [x[:x.find('&CurrentWk')] for x in overdue]
-        # overdue = [x[:x.find('Year=')] for x in overdue]
-
-        print "Warning: Overdue time reports (" + str(len(overdue)) + ")."
-        if len(overdue) < 10:
-            print '\n'.join(overdue)
-
-        for day in overdue:
-            if not args['--quiet']:
-                hours = prompt_for_hours(day)
-                print br.submit(day, hours)
-        if not args['--quiet']:
-            print "Time reporting is now up to date."
+    def _get_sunday_for_date( self, the_date ):
+        ''' Return the date for the Sunday prior to the given date.
+            SOEEA defines weeks starting with Sunday, so URL dates need to be Sunday based
+        '''
+        day = the_date - datetime.timedelta( days=0 )
+        while day.strftime( '%A' ) != 'Sunday':
+            day = day - datetime.timedelta( days=1 )
+        return day
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit( "Can't run from cmdline" )

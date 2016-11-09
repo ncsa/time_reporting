@@ -1,3 +1,0 @@
-[submodule "deploy/ansible-vim"]
-	path = deploy/ansible-vim
-	url = https://github.com/edthedev/ansible-vim
