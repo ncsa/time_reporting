@@ -1,7 +1,5 @@
 #!./ENV/bin/python
 
-#TODO: replace docopt with argparse
-
 """
 Usage: ptr [options]
 
@@ -10,21 +8,22 @@ Options:
     --csv <CSV>           Format: date,M,T,W,R,F (empty col means 8-hours worked that day)
     --user <USERNAME>     Username
     --pfile <PASSWDFILE>  Plain text passwd ***WARNING: for testing only***
+    --list-overdue        List overdue dates and exit
 
 """
 
-from report_time import TimeReportBrowser
 import fileinput
 import datetime
 import dateutil.parser
 import pprint
 import logging
-
-# From sample run.sh
-import docopt
-import mechanize
 import getpass
 import os
+
+# From ENV
+import report_time
+import docopt
+import mechanize
 
 
 def process_csv( infile ):
@@ -85,11 +84,25 @@ def run( args ):
         data = process_csv( args[ '--csv' ] )
         logging.debug( 'DATA:\n {0}'.format( pprint.pformat( data ) ) )
     else:
-        do_interactive( args ):
-    reporter = TimeReportBrowser( args['--user'], args['--passwd'] )
+        do_interactive( args )
+    reporter = report_time.TimeReportBrowser( args['--user'], args['--passwd'] )
+    # Get Overdue Weeks
+    logging.debug( 'PTR - about to call get_overdue_weeks' )
+    overdue = reporter.get_overdue_weeks()
+    if args[ '--list-overdue' ]:
+        print( "Overdue Dates" )
+        for k in sorted( overdue.keys() ):
+            print( k.strftime( '%Y-%b-%d' ) )
+        raise SystemExit()
+    # Walk through list of user provided dates
     for key in sorted( data ):
         val = data[ key ]
-        reporter.submit( date=key, hours=val )
+        if key in overdue:
+            logging.info( "Submitting overdue date '{0}' ... ".format( key ) )
+            reporter.submit( date=key, hours=val )
+        else:
+            logging.warning( "User submitted date '{0}' is NOT overdue.".format( key ) )
+        # Limit number of submissions
 
 if __name__ == '__main__':
     logging.basicConfig( level=logging.DEBUG )

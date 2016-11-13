@@ -7,6 +7,7 @@ import pprint
 
 # Dependencies
 import mechanize
+import dateutil
 
 DATE_FORMAT = '%m/%d/%Y'
 
@@ -20,7 +21,7 @@ fh.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.ERROR)
 # create formatter and add it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(levelname)s [%(filename)s:%(funcName)s:%(lineno)s] %(message)s')
 fh.setFormatter(formatter)
 ch.setFormatter(formatter)
 # add the handlers to the _LOGGER
@@ -43,9 +44,8 @@ class TimeReportBrowser(object):
         self.result = None
         self.session = mechanize.Browser()
         self.logged_in = None
-        # TODO: need a better way to update last_page (needs to be updated for EVERY open and submit
-        # TODO: maybe overload seesion.open and session.submit
         self.last_page = None
+        _LOGGER.debug( 'End of Init' )
 
 
     # OVERLOAD session.open() AND session.submit() SO THAT LAST PAGE LOADED
@@ -62,8 +62,7 @@ class TimeReportBrowser(object):
 
 
     def _login( self ):
-        ''' INTERNAL ONLY
-            Log in to the site.
+        ''' Log in to the site.
         '''
         if self.logged_in:
             return
@@ -85,7 +84,7 @@ class TimeReportBrowser(object):
 
 
     def get_overdue_weeks( self ):
-        ''' returns dict with key = date in MM/DD/YYYY format
+        ''' returns dict with key = Python datetime.date object
             and value = actual value (ie: month=5&selectedWeek=05/01/2016&CurrentWkYear=2016 )
         '''
         self._load_base()
@@ -94,12 +93,12 @@ class TimeReportBrowser(object):
             self.session.select_form( self.FORM_NAME_OVERDUE_WEEKS )
             select = self.session.form.find_control( "pastDueWeek" )
             for item in select.items:
-                #_LOGGER.debug( "ITEM: {0}".format( item.attrs ) )
-                items[ item.attrs['contents'] ] = item.attrs['value']
+                date = dateutil.parser.parse( 
+                    item.attrs['contents'], dayfirst=False )
+                items[ date ] = item.attrs[ 'value' ]
         else:
             _LOGGER.debug( "Overdue Timesheets form not found" )
         _LOGGER.debug( "get_overdue_weeks: returning items: {0}".format( pprint.pformat( items ) ) )
-        # TODO: do we need to unselect the overdue weeks form?
         return items
 
 
@@ -111,7 +110,7 @@ class TimeReportBrowser(object):
         '''
         self._login()
         # Don't need to load base if last action was login
-        if self.last_page in [ 'BASE', 'LOGIN' ]:
+        if self.last_page in [ 'BASE' ]:
             return
         # no matter the date, this will error out, but gets us the links
         self._open_url( self.URL, last_page='BASE' )
@@ -123,6 +122,7 @@ class TimeReportBrowser(object):
             Use load_edit() for loading a date that was already submitted once.
             Use get_overdue_weeks() to tell the difference.
         '''
+        #_LOGGER.debug( 'got date: {0}'.format( date ) )
         self._load_base()
         sunday = self._get_sunday_for_date( date )
         sunday_str = sunday.strftime( DATE_FORMAT )
@@ -198,12 +198,13 @@ class TimeReportBrowser(object):
             total += int(hours[i]) * 60
             minutes = float( hours[i] % 1 )
             if minutes not in [0.0, 0.25, 0.5, 0.75]:
-                raise ValueError("Please only use hours rounded to the nearest quarter-hour.")
-            mins = str( minutes )
-            if mins == "0.0":
-                mins = "0.00"
-            if mins == "0.5":
-                mins = "0.50"
+                raise ValueError(
+                    "Invalid minutes '{0}'. Must be in quarter-hour increments.".format( minutes ) )
+            mins = '{0:3.2f}'.format( minutes )
+#            if mins == "0.0":
+#                mins = "0.00"
+#            if mins == "0.5":
+#                mins = "0.50"
             formkey = days[i] + "TimesheetMinuteValue"
             _LOGGER.debug( "Attempt to set form item '{0}' to '{1}'".format( formkey, mins ) )
             self.session.form[days[i] + "TimesheetMinuteValue"] = [mins]
@@ -229,7 +230,7 @@ class TimeReportBrowser(object):
         #submit the completed form
         self.result = self.session.submit()
         content = self.result.read()
-        _LOGGER.debug("Submit Result: {0}".format( content ) )
+        _LOGGER.debug("HTML Submit Result: {0}".format( content ) )
         if "You have successfully submitted" not in content:
             raise UserWarning( "Error submitting hours '{0}' for date '{1}'".format( hours, date ) )
         _LOGGER.info( "Successfully submitted hours '{0}' for date '{1}'.".format( hours, date ) )
@@ -251,6 +252,7 @@ class TimeReportBrowser(object):
         ''' Return the date for the Sunday prior to the given date.
             SOEEA defines weeks starting with Sunday, so URL dates need to be Sunday based
         '''
+        #_LOGGER.debug( 'got the_date: {0}'.format( the_date ) )
         day = the_date - datetime.timedelta( days=0 )
         while day.strftime( '%A' ) != 'Sunday':
             day = day - datetime.timedelta( days=1 )
