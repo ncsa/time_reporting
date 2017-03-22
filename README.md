@@ -43,5 +43,3 @@ run.sh --exch
 ```
 run.sh --csv /path/to/csvfile.csv
 ```
-
-See also: [ptr.py](ptr.py)
