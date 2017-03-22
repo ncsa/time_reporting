@@ -1,10 +1,17 @@
 # Positive Time Reporting Tool For SOEEA
 (State Officials and Employees Ethics Act)
 
-A major re-write to turn the hide the SOEEA interaction in a formal library.
+# Requirements
+* Python3
+* The following dependencies will be installed by *setup.sh*
+** Grab (https://pypi.python.org/pypi/grab)
+** Exchangelib (https://pypi.python.org/pypi/exchangelib/)
 
-This first version is still very basic and is missing some of the functionality
-of the old tool (such as gpg encrypted password).
+# Installation
+1. git clone https://github.com/ncsa/time_reporting.git
+1. cd time_reporting
+1. ./setup.sh
 
-## Usage
-See [ptr.py](ptr.py)
+# Usage
+1. *run.sh*
+See also: [ptr.py](ptr.py)

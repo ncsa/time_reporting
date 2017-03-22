@@ -1,2 +1,2 @@
 #/bin/bash
-./ENV/bin/python ptr.py "$@"
+./ENV/bin/python3 ptr.py "$@"

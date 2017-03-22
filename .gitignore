@@ -1,6 +1,5 @@
 *.pyc
 *.gpg
-Session.vim
-*.log
-.vagrant
+activate
 ENV
+__pycache__
