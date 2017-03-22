@@ -148,7 +148,7 @@ class PyExch( object ):
 
 
         #DEBUG
-        #today = datetime.date(2016, 11, 27)
+        #today = datetime.date(2016, 12, 5)
 
 
         last_sunday = self.get_sunday_for_date( today )
@@ -161,19 +161,16 @@ class PyExch( object ):
         default_week = [ 0, 8, 8, 8, 8, 8, 0 ]
         weeks = {}
         #TODO - Create default weeks for all weeks, then loop only over exch dates
-        #loop over dates in range, replace default data with that from exch
-        for i in range( 0, diff.days ):
-            idx = i%7 #index into array of daily hours worked
-            idate = start_date + datetime.timedelta( days=i )
-            logging.debug( "Processing date: {0}".format( idate ) )
-            if idx == 0:
-                # start new week
-                logging.debug( "Start new week" )
-                cur_sunday = idate
-                weeks[ cur_sunday ] = list( default_week )
-            if idate in daily_hours:
-                logging.debug( "Found match in exch data: hours={0}".format( daily_hours[ idate ] ) )
-                weeks[ cur_sunday ][idx] = daily_hours[ idate ]
+        # autocreate default weeks
+        for i in range( 0 , diff.days, 7 ):
+            sunday = start_date + datetime.timedelta( days=i )
+            weeks[ sunday ] = list( default_week )
+        #loop over all event dates, replace default data with exch event
+        for k,v in daily_hours.items():
+            logging.debug( "Processing date: {0}".format( k ) )
+            idx = ( k.weekday() + 1 ) % 7 #index into array of daily hours worked
+            sunday = self.get_sunday_for_date( k )
+            weeks[ sunday ][ idx ] = v
         return weeks
                 
 
