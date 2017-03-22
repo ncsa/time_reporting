@@ -13,9 +13,20 @@
 1. ./setup.sh
 
 # Usage
-## Cmdline Usage
 ```
-run.sh --help
+usage: ptr.py [-h] [--user USER] [--pwdfile PWDFILE]
+              (--csv CSV | --exch | --list-overdue)
+
+SEOAA Positive Time Reporting tool.
+
+optional arguments:
+  -h, --help         show this help message and exit
+  --user USER        Username
+  --pwdfile PWDFILE  Plain text passwd ***WARNING: for testing only***
+  --csv CSV          Format: date,M,T,W,R,F (empty col means 8-hours worked
+                     that day)
+  --exch             Load data from Exchange
+  --list-overdue     List overdue dates and exit
 ```
 
 ## List overdue dates
