@@ -14,7 +14,7 @@
 
 # Usage
 ```
-usage: ptr.py [-h] [--user USER] [--pwdfile PWDFILE]
+usage: ptr.py [-h] [--user USER] [--pwdfile PWDFILE] [-n] [-q] [-d] [-o]
               (--csv CSV | --exch | --list-overdue)
 
 SEOAA Positive Time Reporting tool.
@@ -23,6 +23,10 @@ optional arguments:
   -h, --help         show this help message and exit
   --user USER        Username
   --pwdfile PWDFILE  Plain text passwd ***WARNING: for testing only***
+  -n, --dryrun
+  -q, --quiet
+  -d, --debug
+  -o, --once         Submit only one week, then exit.
   --csv CSV          Format: date,M,T,W,R,F (empty col means 8-hours worked
                      that day)
   --exch             Load data from Exchange
@@ -37,6 +41,16 @@ run.sh --list-overdue
 ## Submit overdue timesheets using data from Exchange
 ```
 run.sh --exch
+```
+
+## Submit only one (oldest) overdue week
+```
+run.sh --exch -o 
+```
+
+## Check data without submitting (dry) run
+```
+run.sh --exch -n
 ```
 
 ## Submit overdue timesheets using data from CSV file
