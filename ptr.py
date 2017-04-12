@@ -18,6 +18,11 @@ def process_args():
     parser.add_argument( '--pwdfile',
         help='Plain text passwd ***WARNING: for testing only***' )
     parser.add_argument( '--passwd', help=argparse.SUPPRESS )
+    parser.add_argument( '-n', '--dryrun', action='store_true' )
+    parser.add_argument( '-q', '--quiet', action='store_true' )
+    parser.add_argument( '-d', '--debug', action='store_true' )
+    parser.add_argument( '-o', '--once', action='store_true',
+        help='Submit only one week, then exit.' )
     action = parser.add_mutually_exclusive_group( required=True )
     action.add_argument( '--csv',
         help='Format: date,M,T,W,R,F (empty col means 8-hours worked that day)' )
@@ -102,21 +107,27 @@ def run( args ):
         pyex = pyexch.PyExch( pwd=args.passwd )
         start_date = min( overdue.keys() )
         data = pyex.weekly_hours_worked( datetime.datetime.combine( start_date, datetime.time() ) )
-        pprint.pprint( data )
-        raise SystemExit( "Hard Stop! Still Debugging pyexch" )
-#    # Walk through list of overdue dates
-#    for key in sorted( overdue ):
-#        logging.debug( 'Overdue date: {0}'.format( key ) )
-#        if key in data:
-#            logging.debug( 'Found match: KEY:{0} VAL:{1}'.format( key, data[ key ] ) )
-#            reporter.submit( date=key, hours=data[ key ] )
+    # Walk through list of overdue dates
+    for key in sorted( overdue ):
+        logging.info( 'Overdue date: {0}'.format( key ) )
+        if key in data:
+            logging.info( 'Found match: KEY:{0} VAL:{1}'.format( key, data[ key ] ) )
+            if not args.dryrun:
+                reporter.submit( date=key, hours=data[ key ] )
+                logging.info( 'Successfully submitted week:{0} hours:{1}'.format( key, data[ key ] ) )
+            if args.once:
+                raise SystemExit()
         
 
 if __name__ == '__main__':
-    logging.basicConfig( level=logging.DEBUG )
+    logging.basicConfig( level=logging.INFO )
 #    for key in logging.Logger.manager.loggerDict:
 #        print(key)
     for key in [ 'weblib', 'selection', 'grab', 'time_reporter', 'requests', 'ntlm_auth', 'exchangelib', 'future_stdlib' ] :
         logging.getLogger(key).setLevel(logging.CRITICAL)
     args = process_args()
+    if args.debug:
+        logging.getLogger().setLevel( logging.DEBUG )
+    elif args.quiet:
+        logging.getLogger().setLevel( logging.WARNING )
     run( args )
