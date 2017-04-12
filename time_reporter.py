@@ -90,7 +90,6 @@ class Time_Reporter( object ):
         today = datetime.date.today()
         if date > today:
             raise UserWarning( 'Date "{0}" is in the future.'.format( date ) )
-        #sunday = self.get_sunday_for_date( date )
         month = str( date.month )
         date_str = date.strftime( self.DATE_FORMAT )
         cur_yr = today.strftime( '%Y' )
@@ -111,7 +110,6 @@ class Time_Reporter( object ):
         overdue_weekdates = {}
         self.g.doc.choose_form( name='frmPastDueTimesheet' )
         for elem in self.g.doc.form.inputs:
-#            print( '{0} ({1})\n'.format( elem.name, elem.tag ) )
             if elem.name == 'pastDueWeek':
                 for v in elem.value_options:
                     # Parse option value ...
@@ -171,45 +169,6 @@ class Time_Reporter( object ):
         self.g.doc.text_assert( assert_str )
         self.g.doc.save( '05_saved_time.html' )
 
-
-#    @staticmethod
-#    def get_sunday_for_date( indate ):
-#        ''' Return the date for the Sunday prior to the given date.
-#            SOEEA defines weeks starting with Sunday, so URL dates need to be Sunday based
-#        '''
-#        weekday = indate.weekday()
-#        diff = weekday - ( ( weekday + 1 ) % 7 )
-#        return indate - datetime.timedelta( days=diff )
-
-
-## Submit time for date
-#g.doc.choose_form( name='frmTimesheet' )
-#hours = [ 0, 8, 8, 8, 8, 0, 0 ]
-#days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
-#total = 0
-#for i in range( len( days ) ):
-#    input_name = days[i] + "TimesheetHourValue"
-#    hrs = int( hours[i] )
-#    g.doc.set_input( input_name, str( hrs ) )
-#    total += int(hours[i]) * 60
-#    minutes = float( hours[i] % 1 )
-#    if minutes not in [0.0, 0.25, 0.5, 0.75]:
-#        raise ValueError(
-#            "Invalid minutes '{0}'. Must be in quarter-hour increments.".format( 
-#            minutes ) )
-#    mins = '{0:3.2f}'.format( minutes )
-#    input_name = days[i] + "TimesheetMinuteValue"
-#    g.doc.set_input( input_name, mins )
-#    total += minutes
-## set totals fields
-#g.doc.set_input( 'WeekTotalHours', str( int( total / 60 ) ) )
-#g.doc.set_input( 'WeekTotalMinutes', str( total % 60 ) )
-#resp = g.submit()
-#filename = '05_saved_time.html'
-#resp.save( filename )
-#print( filename )
-#print( resp.url )
-#g.doc.text_assert( 'You have successfully submitted' )
 
 if __name__ == '__main__':
     print( 'Time Reporter Module not valid from cmdline' )

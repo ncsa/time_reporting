@@ -7,19 +7,13 @@ import collections
 import logging
 
 # From ENV
-#import pytz
 import tzlocal
 import exchangelib
-#from exchangelib import DELEGATE, IMPERSONATION, Account, Credentials, \
-#    EWSDateTime, EWSTimeZone, Configuration, NTLM, CalendarItem, Message, \
-#    Mailbox, Attendee, Q
-#from exchangelib.folders import Calendar, ExtendedProperty, FileAttachment, ItemAttachment, \
-#    HTMLBody
 
 ###
 # Work-around for missing TZ's in exchangelib
 #
-# Should get fixed in https://github.com/ncsa/exchangelib/pull/1
+# Hopefully will get fixed in https://github.com/ncsa/exchangelib/pull/1
 missing_timezones = { 'America/Chicago': 'Central Standard Time' }
 exchangelib.EWSTimeZone.PYTZ_TO_MS_MAP.update( missing_timezones )
 #
@@ -110,16 +104,13 @@ class PyExch( object ):
         raw_events = self.get_date_range_filtered( start )
         dates = {}
         for e in raw_events:
-#            logging.debug( "Processing raw event: {0}".format( e ) )
             for i in range( 0, e.elapsed.days ):
                 key = e.start + datetime.timedelta( days=i )
-#                logging.debug( "Saving key '{0}' with 0 hours".format( key.date() ) )
                 dates[ key.date() ] = 0
             if not e.is_all_day:
                 remainder = 28800 - e.elapsed.seconds
                 hours = int( max( remainder, 0 ) / 3600 )
                 key = e.end
-#                logging.debug( "Saving remainder key '{0}' with '{1}' hours".format( key.date(), hours ) )
                 dates[ key.date() ] = hours
         return dates
 
@@ -145,12 +136,6 @@ class PyExch( object ):
         daily_hours = self.daily_hours_worked( start )
         logging.debug( 'daily_hours: {0}'.format( pprint.pformat( daily_hours ) ) )
         today = datetime.date.today()
-
-
-        #DEBUG
-        #today = datetime.date(2016, 12, 5)
-
-
         last_sunday = self.get_sunday_for_date( today )
         logging.debug( "last_sunday: {0}".format( last_sunday ) )
         diff = last_sunday - start_date
@@ -161,16 +146,19 @@ class PyExch( object ):
         default_week = [ 0, 8, 8, 8, 8, 8, 0 ]
         weeks = {}
         #TODO - Create default weeks for all weeks, then loop only over exch dates
-        # autocreate default weeks
-        for i in range( 0 , diff.days, 7 ):
-            sunday = start_date + datetime.timedelta( days=i )
-            weeks[ sunday ] = list( default_week )
-        #loop over all event dates, replace default data with exch event
-        for k,v in daily_hours.items():
-            logging.debug( "Processing date: {0}".format( k ) )
-            idx = ( k.weekday() + 1 ) % 7 #index into array of daily hours worked
-            sunday = self.get_sunday_for_date( k )
-            weeks[ sunday ][ idx ] = v
+        #loop over dates in range, replace default data with that from exch
+        for i in range( 0, diff.days ):
+            idx = i%7 #index into array of daily hours worked
+            idate = start_date + datetime.timedelta( days=i )
+            logging.debug( "Processing date: {0}".format( idate ) )
+            if idx == 0:
+                # start new week
+                logging.debug( "Start new week" )
+                cur_sunday = idate
+                weeks[ cur_sunday ] = list( default_week )
+            if idate in daily_hours:
+                logging.debug( "Found match in exch data: hours={0}".format( daily_hours[ idate ] ) )
+                weeks[ cur_sunday ][idx] = daily_hours[ idate ]
         return weeks
                 
 
