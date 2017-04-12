@@ -1,5 +1,7 @@
 # Positive Time Reporting Tool For SOEEA
-(State Officials and Employees Ethics Act)
+State Officials and Employees Ethics Act
+
+This is a complete re-write from original sources, but still, would not have been possible without the examples and ideas from those who wrote before me.  Kudos.  I stand on the shoulders of giants.
 
 # Requirements
 * Python3
@@ -11,6 +13,17 @@
 1. git clone https://github.com/ncsa/time_reporting.git
 1. cd time_reporting
 1. ./setup.sh
+
+## Installation Troubleshooting
+OpenSSL issues
+```
+pycurl: libcurl link-time ssl backend (<library>) is different from compile-time ssl backend (<library> or "none/other")
+```
+If you get an error similar to the above, edit `setup.sh` to export the specific `link-time` backend specified in the error message and try again.
+
+See also: http://stackoverflow.com/questions/21096436/ssl-backend-error-when-using-openssl
+
+See also: http://stackoverflow.com/questions/21487278/ssl-error-installing-pycurl-after-ssl-is-set
 
 # Usage
 ```
