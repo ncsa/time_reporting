@@ -167,7 +167,6 @@ class Time_Reporter( object ):
         self._submit( last_page=lp )
         assert_str = 'You have successfully submitted your time spent on University business for the week of {0}.'.format( date_str )
         self.g.doc.text_assert( assert_str )
-        self.g.doc.save( '05_saved_time.html' )
 
 
 if __name__ == '__main__':
