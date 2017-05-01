@@ -44,6 +44,10 @@ optional arguments:
                      that day)
   --exch             Load data from Exchange
   --list-overdue     List overdue dates and exit
+
+Set environment variable PYEXCH_REGEX to control matching of Exchange events.
+Regex matching is always case-insensitive. Default value is
+PYEXCH_REGEX=(sick|holiday|vacation|out of office|OOTO)
 ```
 
 ## List overdue dates
@@ -69,4 +73,13 @@ run.sh --exch -n
 ## Submit overdue timesheets using data from CSV file
 ```
 run.sh --csv /path/to/csvfile.csv
+```
+
+## Customize regular expression to match Exchange events
+Regex is used to match events in Exchange that represent time not worked (such as
+vacation, out of office, holiday, sick, etc...). Matching is always case
+in-sensitive.  The regex searches the event *subject*.
+```
+export PYEXCH_REGEXP='(on holiday|PTO|personal)'
+run.sh --exch --dryrun
 ```

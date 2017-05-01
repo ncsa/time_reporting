@@ -12,8 +12,14 @@ import pyexch
 
 
 def process_args():
-    description='SEOAA Positive Time Reporting tool.'
-    parser = argparse.ArgumentParser( description=description )
+    desc = { 'description': 'SEOAA Positive Time Reporting tool.',
+             'epilog': '''Set environment variable PYEXCH_REGEX 
+                          to control matching of Exchange events. 
+                          Regex matching is always case-insensitive. 
+                          Default value is PYEXCH_REGEX={}
+                       '''.format( pyexch.PyExch.DEFAULT_REGEX )
+           }
+    parser = argparse.ArgumentParser( **desc )
     parser.add_argument( '--user', help='Username' )
     parser.add_argument( '--pwdfile',
         help='Plain text passwd ***WARNING: for testing only***' )
