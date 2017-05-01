@@ -26,6 +26,9 @@ simple_event = collections.namedtuple( 'SimpleEvent', [ "start",
 
 
 class PyExch( object ):
+
+    DEFAULT_REGEX = '(sick|holiday|vacation|out of office|OOTO)'
+
     def __init__( self, user=None, email=None, pwd=None, regexp=None ):
         ''' User should be in DOMAIN\\USERNAME format.
         '''
@@ -72,8 +75,7 @@ class PyExch( object ):
             with open( pfile ) as f:
                 self.pwd = f.read().strip()
         if not self.regexp:
-            default_re = '(Holiday|out|OOTO|Vacation)'
-            self.regexp = os.getenv( 'PYEXCH_REGEXP', default_re )
+            self.regexp = os.getenv( 'PYEXCH_REGEXP', PyExch.DEFAULT_REGEX )
 
     def _set_timezone( self ):
         tz_str = tzlocal.get_localzone()
