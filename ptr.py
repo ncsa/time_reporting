@@ -13,11 +13,17 @@ import pyexch
 
 def process_args():
     desc = { 'description': 'SEOAA Positive Time Reporting tool.',
-             'epilog': '''Set environment variable PYEXCH_REGEX 
-                          to control matching of Exchange events. 
+             'epilog': '''Set environment variable PYEXCH_REGEX_CONFIG
+                          as a filename of a YAML formatted file with settings:
+                          PYEXCH_REGEX_CLASSES = Dict
+                          One of: PYEXCH_USER or PYEXCH_AD_DOMAIN
+                            PYEXCH_USER = String; in the form user\\AD_DOMAIN
+                            PYEXCH_AD_DOMAIN = String
+                          One of: PYEXCH_EMAIL or PYEXCH_EMAIL_DOMAIN
+                            PYEXCH_EMAIL = String; in the form user@email.domain
+                            PYEXCH_EMAIL_DOMAIN = String
                           Regex matching is always case-insensitive. 
-                          Default value is PYEXCH_REGEX={}
-                       '''.format( pyexch.PyExch.DEFAULT_REGEX )
+                       '''
            }
     parser = argparse.ArgumentParser( **desc )
     parser.add_argument( '--user', help='Username' )
@@ -87,12 +93,78 @@ def process_csv( infile ):
             if d.weekday() != 6:
                 logging.warn( "date is not a Sunday, skipping record" )
                 continue
-            weekday_hours = [ 8 if len(x)<1 else int(x) for x in parts[1:6] ]
+            weekday_hours = []
+            for x in parts[1:6] :
+                hourdata = time_reporter.WorkdayHours( 8, 0 )
+                if len( x ) > 0:
+                    hourdata.full_hours = int( x )
+                weekday_hours.append( hourdata )
             if len( weekday_hours ) != 5:
                 logging.warn( "expected 5 workdays, got {0}".format( len( weekday_hours ) ) )
                 continue
             dates_hours[ d ] =  weekday_hours
     return dates_hours
+
+
+def get_sunday_for_date( indate ):
+        ''' Return the date for the Sunday prior to the given date.
+            SOEEA defines weeks starting with Sunday, so URL dates need to be Sunday based
+        '''
+        weekday = indate.weekday()
+        diff = ( weekday + 1 ) % 7
+        return indate - datetime.timedelta( days=diff )
+
+
+def weekly_hours_worked( start_date ):
+    ''' Get data from Exchange
+        Convert to weekly format suitable for time_reporter.submit
+    '''
+    ptr_regex = { 'NOTWORK': '(sick|doctor|dr. appt|vacation|OOTO|OOO|out of the office|out of office)' }
+    pyex = pyexch.PyExch( pwd=args.passwd, regex_map=ptr_regex )
+    #start_date = min( overdue.keys() )
+    start_datetime = datetime.datetime.combine( start_date, datetime.time() )
+    daily_report = pyex.per_day_report( start_datetime )
+    # convert to hours worked per day
+    daily_hours = {}
+    for day, data in daily_report.items():
+        work_secs = max( 28800 - data[ 'NOTWORK' ], 0 )
+        full_hours = int( work_secs / 3600 )
+        remainder = work_secs % 3600
+        qtr_hours = int( remainder / 15 )
+        if ( remainder % 15 ) > 7 :
+            qtr_hours += 1
+        if qtr_hours > 3:
+            qtr_hours = 0
+            full_hours += 1
+        daily_hours[ day ] = time_reporter.WorkdayHours( full_hours, qtr_hours )
+    logging.debug( 'daily_hours: {0}'.format( pprint.pformat( daily_hours ) ) )
+    today = datetime.date.today()
+    last_sunday = get_sunday_for_date( today )
+    logging.debug( "last_sunday: {0}".format( last_sunday ) )
+    diff = last_sunday - start_date
+    logging.debug( "diff: {0}".format( diff ) )
+    # stop if attempt to report less than one week
+    if diff.days < 7:
+        raise SystemExit( "Nothing to report yet." )
+    zero = time_reporter.WorkdayHours( 0, 0 )
+    eight = time_reporter.WorkdayHours( 8, 0 )
+    default_week = [ zero, eight, eight, eight, eight, eight, zero ]
+    weeks = {}
+    #loop over dates in range, replace default data with that from exch
+    for i in range( 0, diff.days ):
+        idx = i%7 #index into array of daily hours worked
+        idate = start_date + datetime.timedelta( days=i )
+        logging.debug( "Processing date: {0}".format( idate ) )
+        if idx == 0:
+            # start new week
+            logging.debug( "Start new week" )
+            cur_sunday = idate
+            weeks[ cur_sunday ] = list( default_week )
+        if idate in daily_hours:
+            logging.debug( "Found match in exch data: {0}".format( daily_hours[ idate ] ) )
+            weeks[ cur_sunday ][ idx ] = daily_hours[ idate ]
+    return weeks
+
 
 
 def run( args ):
@@ -110,9 +182,7 @@ def run( args ):
         data = process_csv( args.csv )
         logging.debug( 'CSV data: {0}'.format( pprint.pformat( data ) ) )
     elif args.exch:
-        pyex = pyexch.PyExch( pwd=args.passwd )
-        start_date = min( overdue.keys() )
-        data = pyex.weekly_hours_worked( datetime.datetime.combine( start_date, datetime.time() ) )
+        data = weekly_hours_worked( start_date=min( overdue ) )
     # Walk through list of overdue dates
     for key in sorted( overdue ):
         logging.info( 'Overdue date: {0}'.format( key ) )

@@ -1,6 +1,7 @@
 import os
 import datetime
 import logging
+import collections
 
 #external dependencies
 import grab
@@ -20,6 +21,9 @@ ch.setFormatter(formatter)
 # add the handlers to the _LOGGER
 _LOGGER.addHandler(fh)
 _LOGGER.addHandler(ch)
+
+
+WorkdayHours = collections.namedtuple( 'WorkdayHours', [ 'full_hours', 'qtr_hours' ] )
 
 
 class Time_Reporter( object ):
@@ -122,15 +126,17 @@ class Time_Reporter( object ):
 
     def submit( self, date, hours ):
         ''' Submit time worked during for the week containing the specified date.
-            Date should be a Python date or datetime object.
-            Hours should be a Python list object (of length 5 or 7, all values must be integers).
+            Date must be a Python date or datetime object.
+            Hours must be a Python list (of length 5 or 7, all values must be of type
+            time_reporter.WorkdayHours)
             The date must be an unsubmitted week.
         '''
         _LOGGER.debug( 'Request to submit hours for date "{0}"'.format( date ) )
         # Implicitly convert 5 day week into 7 day week.
         if len( hours ) == 5:
-            hours.insert(0, 0)
-            hours.append(0)
+            workday0 = time_reporter.WorkdayHours( 0, 0 )
+            hours.insert( 0, workday0 )
+            hours.append( workday0 )
         if len( hours ) != 7 :
             raise UserWarning( "Expected either 5 or 7 hour values, got '{0}'".format( len( hours ) ) )
         _LOGGER.debug( 'hours: {0}'.format( hours ) )
@@ -142,11 +148,11 @@ class Time_Reporter( object ):
         total = 0
         for i in range( len( days ) ):
             input_name = "{0}TimesheetHourValue".format( days[i] )
-            hrs = int( hours[i] )
+            hrs = hours[i].full_hours
             _LOGGER.debug( "Attempt to set form item '{0}' to '{1}'".format( input_name, hrs ) )
             self.g.doc.set_input( input_name, str( hrs ) )
-            total += int(hours[i]) * 60
-            minutes = float( hours[i] % 1 )
+            total += hrs * 60
+            minutes = hours[i].qtr_hours * 0.25
             if minutes not in [0.0, 0.25, 0.5, 0.75]:
                 raise ValueError(
                     "Invalid minutes '{0}'. Must be in quarter-hour increments.".format( 
@@ -158,7 +164,7 @@ class Time_Reporter( object ):
             total += minutes
         # set totals fields
         totals_data = { 'WeekTotalHours': str( int( total / 60 ) ),
-                        'WeekTotalMinutes': str( total % 60 ) }
+                        'WeekTotalMinutes': str( int( total % 60 ) ) }
         for k,v in totals_data.items():
             _LOGGER.debug( "Attempt to set form item '{0}' to '{1}'".format( k, v ) )
             self.g.doc.set_input( k, v )
