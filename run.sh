@@ -12,4 +12,4 @@ IFS="$OIFS"
 PYTHONPATH="$PYPATH" \
 PYEXCH_AD_DOMAIN=UOFI \
 PYEXCH_EMAIL_DOMAIN=illinois.edu \
-./ENV/bin/python3 ptr.py "$@"
+python3 ptr.py "$@"

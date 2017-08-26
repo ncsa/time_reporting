@@ -5,6 +5,7 @@ import argparse
 import getpass
 import pprint
 import datetime
+import os
 
 # Local Dependencies
 import time_reporter
@@ -13,15 +14,10 @@ import pyexch
 
 def process_args():
     desc = { 'description': 'SEOAA Positive Time Reporting tool.',
-             'epilog': '''Set environment variable PYEXCH_REGEX_CONFIG
-                          as a filename of a YAML formatted file with settings:
-                          PYEXCH_REGEX_CLASSES = Dict
-                          One of: PYEXCH_USER or PYEXCH_AD_DOMAIN
-                            PYEXCH_USER = String; in the form user\\AD_DOMAIN
-                            PYEXCH_AD_DOMAIN = String
-                          One of: PYEXCH_EMAIL or PYEXCH_EMAIL_DOMAIN
-                            PYEXCH_EMAIL = String; in the form user@email.domain
-                            PYEXCH_EMAIL_DOMAIN = String
+             'epilog': '''PYEXCH_REGEX_CLASSES = Dict
+                          PYEXCH_USER = String
+                          PYEXCH_AD_DOMAIN = String
+                          PYEXCH_EMAIL_DOMAIN = String
                           Regex matching is always case-insensitive. 
                        '''
            }
@@ -50,15 +46,20 @@ def process_args():
     args = parser.parse_args()
     # check user
     if not args.user:
+        args.user = os.getenv( 'PYEXCH_USER' )
+    if not args.user:
         args.user = getpass.getuser()
         logging.info( 'No user specified. Using "{0}".'.format( args.user ) )
-    if args.pwdfile:
-        # get passwd from file
-        with open( args.pwdfile, 'r' ) as f:
-            for l in f:
-                args.passwd = l.rstrip()
-                break
-    else:
+    if not args.passwd:
+        if not args.pwdfile:
+            args.pwdfile = os.getenv( 'PYEXCH_PWD_FILE' )
+        if args.pwdfile:
+            # get passwd from file
+            with open( args.pwdfile, 'r' ) as f:
+                for l in f:
+                    args.passwd = l.rstrip()
+                    break
+    if not args.passwd:
         # prompt user for passwd
         prompt = "Enter passwd for '{0}':".format( args.user )
         args.passwd = getpass.getpass( prompt )
