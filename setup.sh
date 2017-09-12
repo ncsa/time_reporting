@@ -1,16 +1,25 @@
 #/bin/bash
-py3=$( which python3 )
-if [[ -z "$py3" ]] ; then
-    echo "Python3 Required"
-    exit 1
-fi
-python3 -m venv ENV
-./ENV/bin/pip3 install -r requirements.txt
 
-#Fix pycurl library
-./ENV/bin/pip3 uninstall pycurl
-export PYCURL_SSL_LIBRARY=nss
-./ENV/bin/pip3 install --compile pycurl
+# Get Python
+read pycmd < <( ./get_py_assert_min_version.sh 3 )
+rc=$?
+if [[ $rc -ne 0 ]] ; then
+    echo "Fatal Errors: while finding python"
+    exit $rc
+fi
+if [[ -z "$pycmd" ]] ; then
+    echo "Oops, where's python?"
+    exit 99
+fi
+
+# Setup Virtual Environment
+$pycmd -m venv ENV
+./ENV/bin/pip install -r requirements.txt
+
+##Fix pycurl library
+#./ENV/bin/pip3 uninstall pycurl
+#export PYCURL_SSL_LIBRARY=nss
+#./ENV/bin/pip3 install --compile pycurl
 
 # Update git submodules
 git submodule update --init

@@ -22,10 +22,6 @@ def process_args():
                        '''
            }
     parser = argparse.ArgumentParser( **desc )
-    parser.add_argument( '--user', help='Username' )
-    parser.add_argument( '--pwdfile',
-        help='Plain text passwd ***WARNING: for testing only***' )
-    parser.add_argument( '--passwd', help=argparse.SUPPRESS )
     parser.add_argument( '-n', '--dryrun', action='store_true' )
     parser.add_argument( '-q', '--quiet', action='store_true' )
     parser.add_argument( '-d', '--debug', action='store_true' )
@@ -46,11 +42,16 @@ def process_args():
     args = parser.parse_args()
     # check user
     if not args.user:
+        args.user = os.getenv( 'PTR_USER' )
+    if not args.user:
         args.user = os.getenv( 'PYEXCH_USER' )
     if not args.user:
         args.user = getpass.getuser()
         logging.info( 'No user specified. Using "{0}".'.format( args.user ) )
+    # PASSWD
     if not args.passwd:
+        if not args.pwdfile:
+            args.pwdfile = os.getenv( 'PTR_PWD_FILE' )
         if not args.pwdfile:
             args.pwdfile = os.getenv( 'PYEXCH_PWD_FILE' )
         if args.pwdfile:
@@ -63,9 +64,6 @@ def process_args():
         # prompt user for passwd
         prompt = "Enter passwd for '{0}':".format( args.user )
         args.passwd = getpass.getpass( prompt )
-#    # if no action specified, list-overdue dates
-#    if not args.csv or not args.exch :
-#        args.list_overdue = True
     return args
 
 
@@ -120,8 +118,8 @@ def weekly_hours_worked( start_date ):
     ''' Get data from Exchange
         Convert to weekly format suitable for time_reporter.submit
     '''
-    ptr_regex = { 'NOTWORK': '(sick|doctor|dr. appt|vacation|OOTO|OOO|out of the office|out of office)' }
-    pyex = pyexch.PyExch( pwd=args.passwd, regex_map=ptr_regex )
+    #ptr_regex = { 'NOTWORK': '(sick|doctor|dr. appt|vacation|OOTO|OOO|out of the office|out of office)' }
+    pyex = pyexch.PyExch()
     #start_date = min( overdue.keys() )
     start_datetime = datetime.datetime.combine( start_date, datetime.time() )
     daily_report = pyex.per_day_report( start_datetime )

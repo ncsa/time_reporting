@@ -3,3 +3,5 @@
 activate
 ENV
 __pycache__
+private
+UOFI
