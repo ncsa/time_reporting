@@ -19,6 +19,7 @@ TODO
 1. git clone https://github.com/ncsa/time_reporting.git
 1. cd time_reporting
 1. ./setup.sh
+1. ./run.sh --help
 
 ### VirtualEnv Installation Troubleshooting
 OpenSSL issues
@@ -34,10 +35,10 @@ See also: http://stackoverflow.com/questions/21487278/ssl-error-installing-pycur
 # Usage
 ## Setup Environment Variables
 * NETRC
-  * Path to a _netrc_ formatted file
+  * Path to a [netrc](https://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-file.html) formatted file
   * Default: ~/.netrc
 * PYEXCH_REGEX_JSON
-  * JSON formatted string with key _NOTWORK_ and value regex string
+  * [JSON dictionary](https://www.w3resource.com/JSON/structures.php) formatted string with key _NOTWORK_ and value regex string
   * Default: '{"NOTWORK": "(sick|doctor|dr. appt|vacation|OOTO|OOO|out of the office|out of office)"}'
 
 ## Test program setup and execution
@@ -89,7 +90,7 @@ Netrc file should follow
   * Used by [pyexch](https://github.com/andylytical/pyexch) to access Exchange calendar
   * Required parameters
     * login
-      * for *@illinois.edu*, format should be *user@domain*
+      * for *illinois.edu*, format should be *user@domain*
       * other exchange implementations may require the *domain\user*  format
     * account
       * format should be *user@domain*
@@ -98,8 +99,8 @@ Netrc file should follow
 ## Sample Netrc
 ```
 machine IL_PTR
-login myvslusername
-password myvslpassword
+login myptrusername
+password myptrpassword
 
 machine EXCH
 login myexchusername@illinois.edu
@@ -112,6 +113,7 @@ Regex matching is always case-insensitive.
 
 Default value is
 PYEXCH_REGEX_JSON='{"NOTWORK":"(sick|doctor|dr. appt|vacation|OOTO|OOO|out of the office|out of office)"}'
+
 Regex is used to match events in Exchange that represent time not worked (such as
 vacation, out of office, holiday, sick, etc...). Matching is always case-insensitive.
  The regex searches the event *subject*.
