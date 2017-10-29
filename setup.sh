@@ -13,13 +13,13 @@ if [[ -z "$pycmd" ]] ; then
 fi
 
 # Setup Virtual Environment
-$pycmd -m venv ENV
-./ENV/bin/pip install -r requirements.txt
+$pycmd -m venv env
+./env/bin/pip install -r requirements.txt
 
 ##Fix pycurl library
-#./ENV/bin/pip3 uninstall pycurl
+#./env/bin/pip3 uninstall pycurl
 #export PYCURL_SSL_LIBRARY=nss
-#./ENV/bin/pip3 install --compile pycurl
+#./env/bin/pip3 install --compile pycurl
 
 # Update git submodules
 git submodule update --init

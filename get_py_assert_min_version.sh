@@ -10,7 +10,7 @@ min_allowed_version=$1
 # Find max python version available
 max_py_version=0
 max_py_path=
-for p in python3 python ; do
+for p in {env/bin/,}python{$min_allowed_version,} ; do
     py=$( which $p )
     if [[ -n "$py" ]] ; then
         py_major_version=$( $py -c 'import sys; print(sys.version_info[0])' )
