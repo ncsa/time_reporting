@@ -6,64 +6,85 @@ import getpass
 import pprint
 import datetime
 import os
+import netrc
 
 # Local Dependencies
 import time_reporter
 import pyexch
 
+# Custom Help Formatting for argparse, borrowed from:
+# https://stackoverflow.com/questions/18462610/
+class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, 
+                      argparse.RawDescriptionHelpFormatter):
+    pass
+
 
 def process_args():
+    default_regex = { 'NOTWORK' : ("(sick"
+                                   "|doctor"
+                                   "|dr. appt"
+                                   "|vacation"
+                                   "|OOTO"
+                                   "|OOO"
+                                   "|out of the office"
+                                   "|out of office)"
+                                  )
+                    }
     desc = { 'description': 'SEOAA Positive Time Reporting tool.',
-             'epilog': '''PYEXCH_REGEX_CLASSES = Dict
-                          PYEXCH_USER = String
-                          PYEXCH_AD_DOMAIN = String
-                          PYEXCH_EMAIL_DOMAIN = String
-                          Regex matching is always case-insensitive. 
-                       '''
+             'formatter_class': CustomFormatter,
+             'epilog': '''Environment Variables
+    NETRC
+        Path to netrc file
+        NETRC machine names: EXCH, IL_PTR
+        Default: ~/.netrc
+    PYEXCH_REGEX_JSON
+        JSON Dictionary (key/value map)
+        Regex matching is always case-insensitive
+        Default: PYEXCH_REGEX_JSON={}'''.format( default_regex ),
            }
     parser = argparse.ArgumentParser( **desc )
     parser.add_argument( '-n', '--dryrun', action='store_true' )
     parser.add_argument( '-q', '--quiet', action='store_true' )
     parser.add_argument( '-d', '--debug', action='store_true' )
     parser.add_argument( '-o', '--once', action='store_true',
-        help='Submit only one week, then exit.' )
+        help='Submit only one week, then exit. Oldest week will be submitted.' )
     action = parser.add_mutually_exclusive_group( required=True )
-    action.add_argument( '--csv',
+    action.add_argument( '--csv', metavar='FILENAME',
         help='Format: date,M,T,W,R,F (empty col means 8-hours worked that day)' )
     action.add_argument( '--exch', action='store_true',
         help='Load data from Exchange' )
     action.add_argument( '--list-overdue', action='store_true',
         help='List overdue dates and exit' )
-    defaults = { 'user': None,
-                 'pwdfile': None,
-                 'passwd': None,
+    defaults = { 'exch_login': None,
+                 'exch_account': None,
+                 'exch_pwd': None,
+                 'ptr_login': None,
+                 'ptr_pwd': None,
+                 'pyex_re_map': None,
     }
     parser.set_defaults( **defaults )
     args = parser.parse_args()
-    # check user
-    if not args.user:
-        args.user = os.getenv( 'PTR_USER' )
-    if not args.user:
-        args.user = os.getenv( 'PYEXCH_USER' )
-    if not args.user:
-        args.user = getpass.getuser()
-        logging.info( 'No user specified. Using "{0}".'.format( args.user ) )
-    # PASSWD
-    if not args.passwd:
-        if not args.pwdfile:
-            args.pwdfile = os.getenv( 'PTR_PWD_FILE' )
-        if not args.pwdfile:
-            args.pwdfile = os.getenv( 'PYEXCH_PWD_FILE' )
-        if args.pwdfile:
-            # get passwd from file
-            with open( args.pwdfile, 'r' ) as f:
-                for l in f:
-                    args.passwd = l.rstrip()
-                    break
-    if not args.passwd:
-        # prompt user for passwd
-        prompt = "Enter passwd for '{0}':".format( args.user )
-        args.passwd = getpass.getpass( prompt )
+    # Try to get NETRC
+    nrcfn = os.getenv( 'NETRC' )
+    nrc = netrc.netrc( nrcfn )
+    # PYEXCH credentials
+    parts = nrc.authenticators( 'EXCH' )
+    args.exch_login = parts[0]
+    args.exch_account = parts[1]
+    args.exch_pwd = parts[2]
+    # PTR credentials
+    parts = nrc.authenticators( 'IL_PTR' )
+    args.ptr_login = parts[0]
+    args.ptr_pwd = parts[2]
+    # Check credentials aren't empty
+    for a in ( 'exch_login', 'exch_account', 'exch_pwd', 'ptr_login', 'ptr_pwd' ):
+        v = getattr( args, a )
+        if len(v) < 1:
+            raise UserWarning( f"Missing or empty {a}" )
+    # Check for regex_map, use default otherwise
+    args.pyex_re_map = os.getenv( 'PYEXCH_REGEX_MAP' )
+    if not args.pyex_re_map:
+        args.pyex_re_map = default_regex
     return args
 
 
@@ -114,13 +135,10 @@ def get_sunday_for_date( indate ):
         return indate - datetime.timedelta( days=diff )
 
 
-def weekly_hours_worked( start_date ):
+def weekly_hours_worked( pyex, start_date ):
     ''' Get data from Exchange
         Convert to weekly format suitable for time_reporter.submit
     '''
-    #ptr_regex = { 'NOTWORK': '(sick|doctor|dr. appt|vacation|OOTO|OOO|out of the office|out of office)' }
-    pyex = pyexch.PyExch()
-    #start_date = min( overdue.keys() )
     start_datetime = datetime.datetime.combine( start_date, datetime.time() )
     daily_report = pyex.per_day_report( start_datetime )
     # convert to hours worked per day
@@ -168,7 +186,7 @@ def weekly_hours_worked( start_date ):
 
 def run( args ):
     data = {}
-    reporter = time_reporter.Time_Reporter( username=args.user, password=args.passwd )
+    reporter = time_reporter.Time_Reporter( username=args.ptr_login, password=args.ptr_pwd )
     overdue = reporter.get_overdue_weeks()
     if len( overdue ) < 1:
         raise SystemExit( "You have no overdue weeks. Congratulations!" )
@@ -179,9 +197,12 @@ def run( args ):
         raise SystemExit()
     if args.csv:
         data = process_csv( args.csv )
-        logging.debug( 'CSV data: {0}'.format( pprint.pformat( data ) ) )
+        logging.debug( 'CSV data: {}'.format( pprint.pformat( data ) ) )
     elif args.exch:
-        data = weekly_hours_worked( start_date=min( overdue ) )
+        pyex = pyexch.PyExch( login=args.exch_login, pwd=args.exch_pwd, 
+                              account=args.exch_account, regex_map=args.pyex_re_map )
+        data = weekly_hours_worked( pyex, start_date=min( overdue ) )
+        logging.debug( 'Exch data: {}'.format( pprint.pformat( data ) ) )
     # Walk through list of overdue dates
     for key in sorted( overdue ):
         logging.info( 'Overdue date: {0}'.format( key ) )
@@ -196,8 +217,6 @@ def run( args ):
 
 if __name__ == '__main__':
     logging.basicConfig( level=logging.INFO )
-#    for key in logging.Logger.manager.loggerDict:
-#        print(key)
     for key in [ 'weblib', 'selection', 'grab', 'time_reporter', 'requests', 'ntlm_auth', 'exchangelib', 'future_stdlib' ] :
         logging.getLogger(key).setLevel(logging.CRITICAL)
     args = process_args()
@@ -205,4 +224,5 @@ if __name__ == '__main__':
         logging.getLogger().setLevel( logging.DEBUG )
     elif args.quiet:
         logging.getLogger().setLevel( logging.WARNING )
+    logging.debug( 'ARGS: {}'.format( pprint.pformat( args ) ) )
     run( args )

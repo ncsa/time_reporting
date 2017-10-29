@@ -3,18 +3,24 @@ State Officials and Employees Ethics Act
 
 This is a complete re-write from original sources, but still, would not have been possible without the examples and ideas from those who wrote before me.  Kudos.  I stand on the shoulders of giants.
 
-# Requirements
-* Python3
+# Dependencies
+* Python >= 3.6
 * The following dependencies will be installed by *setup.sh*
   * Grab (https://pypi.python.org/pypi/grab)
   * Exchangelib (https://pypi.python.org/pypi/exchangelib/)
 
-# Installation
+# Usage
+This tool can be used in two possible ways: Docker and Python VirtualEnv
+
+## Docker
+TODO
+
+## Python VirtualEnv
 1. git clone https://github.com/ncsa/time_reporting.git
 1. cd time_reporting
 1. ./setup.sh
 
-## Installation Troubleshooting
+### VirtualEnv Installation Troubleshooting
 OpenSSL issues
 ```
 pycurl: libcurl link-time ssl backend (<library>) is different from compile-time ssl backend (<library> or "none/other")
@@ -26,48 +32,42 @@ See also: http://stackoverflow.com/questions/21096436/ssl-backend-error-when-usi
 See also: http://stackoverflow.com/questions/21487278/ssl-error-installing-pycurl-after-ssl-is-set
 
 # Usage
+## Setup Environment Variables
+* NETRC
+  * Path to a _netrc_ formatted file
+  * Default: ~/.netrc
+* PYEXCH_REGEX_JSON
+  * JSON formatted string with key _NOTWORK_ and value regex string
+  * Default: '{"NOTWORK": "(sick|doctor|dr. appt|vacation|OOTO|OOO|out of the office|out of office)"}'
+
+## Test program setup and execution
 ```
-usage: ptr.py [-h] [--user USER] [--pwdfile PWDFILE] [-n] [-q] [-d] [-o]
-              (--csv CSV | --exch | --list-overdue)
-
-SEOAA Positive Time Reporting tool.
-
-optional arguments:
-  -h, --help         show this help message and exit
-  --user USER        Username
-  --pwdfile PWDFILE  Plain text passwd ***WARNING: for testing only***
-  -n, --dryrun
-  -q, --quiet
-  -d, --debug
-  -o, --once         Submit only one week, then exit.
-  --csv CSV          Format: date,M,T,W,R,F (empty col means 8-hours worked
-                     that day)
-  --exch             Load data from Exchange
-  --list-overdue     List overdue dates and exit
-
-Set environment variable PYEXCH_REGEX to control matching of Exchange events.
-Regex matching is always case-insensitive. Default value is
-PYEXCH_REGEX=(sick|holiday|vacation|out of office|OOTO)
+./run.sh --help
 ```
 
-## List overdue dates
+## Test connectivity to Positive Time Reporting website
 ```
 run.sh --list-overdue
 ```
 
-## Submit overdue timesheets using data from Exchange
+## Test connectivity to Exchange
 ```
-run.sh --exch
+run.sh --exch -n
 ```
 
-## Submit only one (oldest) overdue week
+## Submit one PTR report (oldest missing report)
 ```
 run.sh --exch -o 
 ```
 
-## Check data without submitting (dry) run
+## Submit all overdue timesheets using data from Exchange
 ```
-run.sh --exch -n
+run.sh --exch
+```
+
+## Test CSV formatting
+```
+run.sh --csv /path/to/csvfile.csv -n
 ```
 
 ## Submit overdue timesheets using data from CSV file
@@ -75,11 +75,47 @@ run.sh --exch -n
 run.sh --csv /path/to/csvfile.csv
 ```
 
-## Customize regular expression to match Exchange events
-Regex is used to match events in Exchange that represent time not worked (such as
-vacation, out of office, holiday, sick, etc...). Matching is always case
-in-sensitive.  The regex searches the event *subject*.
+# Format of **.netrc** file
+Netrc file should follow 
+[standard formatting rules](https://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-file.html).
+
+## Expected Keys
+* IL_PTR
+  * User and password to login to the SOEEA (PTR) website
+  * Required parameters
+    * login
+    * password
+* EXCH
+  * Used by [pyexch](https://github.com/andylytical/pyexch) to access Exchange calendar
+  * Required parameters
+    * login
+      * for *@illinois.edu*, format should be *user@domain*
+      * other exchange implementations may require the *domain\user*  format
+    * account
+      * format should be *user@domain*
+    * password
+
+## Sample Netrc
 ```
-export PYEXCH_REGEXP='(on holiday|PTO|personal)'
+machine IL_PTR
+login myvslusername
+password myvslpassword
+
+machine EXCH
+login myexchusername@illinois.edu
+password myexchpasswd
+account myexchusername@illinois.edu
+```
+
+# Customize regular expression to match Exchange events
+Regex matching is always case-insensitive.
+
+Default value is
+PYEXCH_REGEX_JSON='{"NOTWORK":"(sick|doctor|dr. appt|vacation|OOTO|OOO|out of the office|out of office)"}'
+Regex is used to match events in Exchange that represent time not worked (such as
+vacation, out of office, holiday, sick, etc...). Matching is always case-insensitive.
+ The regex searches the event *subject*.
+```
+export PYEXCH_REGEXP='{"NOTWORK":"(sick|vacation)"}'
 run.sh --exch --dryrun
 ```
