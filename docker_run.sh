@@ -6,8 +6,6 @@ DEBUG=1
 # Uncomment to enable test mode (show what would be run)
 TEST=1
 
-[[ $DEBUG -eq 1 ]] && set -x
-
 # Set Image Name
 IMAGE="andylytical/ncsa-time-reporting:20171029"
 
@@ -21,6 +19,12 @@ MOUNTPOINT=( "j:\\aloftus\\private" "/private" )
 #   PYEXCH_REGEX_JSON    ( default: pyexch.PyExch.DEFAULT_REGEX_MAP )
 NETRC=/private/.netrc
 #PYEXCH_REGEX_JSON=
+
+###
+# END OF CUSTOMIZATIONS
+###
+
+[[ $DEBUG -eq 1 ]] && set -x
 
 action=
 [[ $TEST -eq 1 ]] && action=echo
