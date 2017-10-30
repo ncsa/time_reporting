@@ -13,7 +13,14 @@ This is a complete re-write from original sources, but still, would not have bee
 This tool can be used in two possible ways: Docker and Python VirtualEnv
 
 ## Docker
-TODO
+1. `curl -o ~/ptr_as_docker.sh https://raw.githubusercontent.com/ncsa/time_reporting/master/docker_run.sh`
+1. Edit `~/ptr_as_docker.sh` to set evnironment variables
+1. `~/ptr_as_docker.sh`
+1. Inside docker container
+   1. `./run.sh --help`
+   1. `./run.sh --list-overdue`
+   1. `./run.sh -n --exch`
+   1. `./run.sh --exch`
 
 ## Python VirtualEnv
 1. git clone https://github.com/ncsa/time_reporting.git
