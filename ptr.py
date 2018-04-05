@@ -20,16 +20,6 @@ class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter,
 
 
 def process_args():
-    default_regex = { 'NOTWORK' : ("(sick"
-                                   "|doctor"
-                                   "|dr. appt"
-                                   "|vacation"
-                                   "|OOTO"
-                                   "|OOO"
-                                   "|out of the office"
-                                   "|out of office)"
-                                  )
-                    }
     desc = { 'description': 'SEOAA Positive Time Reporting tool.',
              'formatter_class': CustomFormatter,
              'epilog': '''Environment Variables
@@ -40,7 +30,7 @@ def process_args():
     PYEXCH_REGEX_JSON
         JSON Dictionary (key/value map)
         Regex matching is always case-insensitive
-        Default: PYEXCH_REGEX_JSON={}'''.format( default_regex ),
+        No Default. This value is required.''',
            }
     parser = argparse.ArgumentParser( **desc )
     parser.add_argument( '-n', '--dryrun', action='store_true' )
@@ -84,7 +74,7 @@ def process_args():
     # Check for regex_map, use default otherwise
     args.pyex_re_map = os.getenv( 'PYEXCH_REGEX_MAP' )
     if not args.pyex_re_map:
-        args.pyex_re_map = default_regex
+        raise UserWarning( 'No value for PYEXCH_REGEX_MAP. Fatal error' )
     return args
 
 
