@@ -71,10 +71,6 @@ def process_args():
         v = getattr( args, a )
         if len(v) < 1:
             raise UserWarning( f"Missing or empty {a}" )
-    # Check for regex_map, use default otherwise
-    args.pyex_re_map = os.getenv( 'PYEXCH_REGEX_MAP' )
-    if not args.pyex_re_map:
-        raise UserWarning( 'No value for PYEXCH_REGEX_MAP. Fatal error' )
     return args
 
 
@@ -189,8 +185,9 @@ def run( args ):
         data = process_csv( args.csv )
         logging.debug( 'CSV data: {}'.format( pprint.pformat( data ) ) )
     elif args.exch:
-        pyex = pyexch.PyExch( login=args.exch_login, pwd=args.exch_pwd, 
-                              account=args.exch_account, regex_map=args.pyex_re_map )
+        pyex = pyexch.PyExch( login=args.exch_login, 
+                              pwd=args.exch_pwd, 
+                              account=args.exch_account )
         data = weekly_hours_worked( pyex, start_date=min( overdue ) )
         logging.debug( 'Exch data: {}'.format( pprint.pformat( data ) ) )
     # Walk through list of overdue dates
