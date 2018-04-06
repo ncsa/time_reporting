@@ -23,7 +23,20 @@ _LOGGER.addHandler(fh)
 _LOGGER.addHandler(ch)
 
 
-WorkdayHours = collections.namedtuple( 'WorkdayHours', [ 'full_hours', 'qtr_hours' ] )
+#WorkdayHours = collections.namedtuple( 'WorkdayHours', [ 'full_hours', 'qtr_hours' ] )
+
+class WorkdayHours( object ):
+    def __init__( self, full_hours, qtr_hours ):
+        self.full_hours = full_hours
+        self.qtr_hours = qtr_hours
+
+    def __str__( self ):
+        return "<{}(full_hours={}, qtr_hours={})>".format( 
+            self.__class__.__name__,
+            self.full_hours,
+            self.qtr_hours
+            )
+    __repr__ = __str__
 
 
 class Time_Reporter( object ):
