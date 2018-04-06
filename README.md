@@ -119,8 +119,10 @@ account myexchusername@illinois.edu
 # Customize regular expression to match Exchange events
 Regex matching is always case-insensitive.
 
-Default value is
+There is no default, a value must be provided. A sample is:
+```
 PYEXCH_REGEX_JSON='{"NOTWORK":"(sick|doctor|dr. appt|vacation|OOTO|OOO|out of the office|out of office)"}'
+```
 
 Regex is used to match events in Exchange that represent time not worked (such as
 vacation, out of office, holiday, sick, etc...). Matching is always case-insensitive.
