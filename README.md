@@ -46,7 +46,8 @@ See also: http://stackoverflow.com/questions/21487278/ssl-error-installing-pycur
   * Default: ~/.netrc
 * PYEXCH_REGEX_JSON
   * [JSON dictionary](https://www.w3resource.com/JSON/structures.php) formatted string with key _NOTWORK_ and value regex string
-  * Default: '{"NOTWORK": "(sick|doctor|dr. appt|vacation|PTO|paid time off|personal day)"}'
+  * No Default. This value is required. An example is below:
+      * `export PYEXCH_REGEX_JSON='{"NOTWORK": "(sick|doctor|dr. appt|vacation|PTO|paid time off|personal day)"}'`
 
 ## Test program setup and execution
 ```
