@@ -14,7 +14,7 @@ import pyexch
 
 # Custom Help Formatting for argparse, borrowed from:
 # https://stackoverflow.com/questions/18462610/
-class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, 
+class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter,
                       argparse.RawDescriptionHelpFormatter):
     pass
 
@@ -50,7 +50,6 @@ def process_args():
                  'exch_pwd': None,
                  'ptr_login': None,
                  'ptr_pwd': None,
-                 'pyex_re_map': None,
     }
     parser.set_defaults( **defaults )
     args = parser.parse_args()
@@ -90,8 +89,8 @@ def process_csv( infile ):
                 logging.warn( "expecting 6 parts, got {0}".format( len(parts) ) )
                 continue
             try:
-                d = datetime.datetime.strptime( 
-                    parts[0], 
+                d = datetime.datetime.strptime(
+                    parts[0],
                     time_reporter.Time_Reporter.DATE_FORMAT )
             except ( ValueError ) as e:
                 logging.warn( "malformed date, skipping record" )
@@ -185,8 +184,8 @@ def run( args ):
         data = process_csv( args.csv )
         logging.debug( 'CSV data: {}'.format( pprint.pformat( data ) ) )
     elif args.exch:
-        pyex = pyexch.PyExch( login=args.exch_login, 
-                              pwd=args.exch_pwd, 
+        pyex = pyexch.PyExch( login=args.exch_login,
+                              pwd=args.exch_pwd,
                               account=args.exch_account )
         data = weekly_hours_worked( pyex, start_date=min( overdue ) )
         logging.debug( 'Exch data: {}'.format( pprint.pformat( data ) ) )
@@ -194,13 +193,21 @@ def run( args ):
     for key in sorted( overdue ):
         logging.info( 'Overdue date: {0}'.format( key ) )
         if key in data:
-            logging.info( 'Found match: KEY:{0} VAL:{1}'.format( key, data[ key ] ) )
+            logging.info( 'Found match: KEY:{0} VAL:{1}'.format(
+                          key,
+                          pprint.pformat( data[ key ] )
+                          )
+            )
             if not args.dryrun:
                 reporter.submit( date=key, hours=data[ key ] )
-                logging.info( 'Successfully submitted week:{0} hours:{1}'.format( key, data[ key ] ) )
+                logging.info( 'Successfully submitted week:{0} hours:{1}'.format(
+                               key,
+                               pprint.pformat( data[ key ] )
+                               )
+                )
             if args.once:
                 raise SystemExit()
-        
+
 
 if __name__ == '__main__':
     logging.basicConfig( level=logging.INFO )
