@@ -13,5 +13,8 @@ OIFS="$IFS"
 IFS=":"; PYPATH="${parts[*]}"
 IFS="$OIFS"
 
+trace_ignores='/usr/local/lib/python3.6'
+
 PYTHONPATH="$PYPATH" \
 $py3 ptr.py "$@"
+#$py3 -m trace --ignore-dir="$trace_ignores" -t ptr.py "$@"
