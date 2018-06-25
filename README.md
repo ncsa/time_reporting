@@ -128,6 +128,6 @@ Regex is used to match events in Exchange that represent time not worked (such a
 vacation, out of office, holiday, sick, etc...). Matching is always case-insensitive.
  The regex searches the event *subject*.
 ```
-export PYEXCH_REGEXP='{"NOTWORK":"(sick|vacation)"}'
+export PYEXCH_REGEX_JSON='{"NOTWORK":"(sick|vacation)"}'
 run.sh --exch --dryrun
 ```
