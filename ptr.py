@@ -211,7 +211,7 @@ def run( args ):
 
 if __name__ == '__main__':
     logging.basicConfig( level=logging.INFO )
-    for key in [ 'weblib', 'selection', 'grab', 'time_reporter', 'requests', 'ntlm_auth', 'exchangelib', 'future_stdlib' ] :
+    for key in [ 'weblib', 'selection', 'grab', 'time_reporter', 'requests', 'ntlm_auth', 'exchangelib', 'future_stdlib', 'urllib3' ] :
         logging.getLogger(key).setLevel(logging.CRITICAL)
     args = process_args()
     if args.debug:
