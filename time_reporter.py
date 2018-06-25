@@ -63,9 +63,9 @@ class Time_Reporter( object ):
 
     def _submit( self, url=None, last_page=None ):
         if url:
-            self.g.doc.submit( url=url )
+            self.g.submit( url=url )
         else:
-            self.g.doc.submit()
+            self.g.submit()
         self.last_page = last_page
 
     def _login( self ):

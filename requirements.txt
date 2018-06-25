@@ -1,4 +1,4 @@
 exchangelib
-grab==0.6.38
+grab
 pycurl==7.19.5.3
 tzlocal
