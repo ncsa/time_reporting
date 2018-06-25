@@ -5,6 +5,7 @@ import collections
 
 #external dependencies
 import grab
+from weblib.error import DataNotFound
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.DEBUG)
@@ -125,15 +126,19 @@ class Time_Reporter( object ):
         '''
         self._load_base()
         overdue_weekdates = {}
-        self.g.doc.choose_form( name='frmPastDueTimesheet' )
-        for elem in self.g.doc.form.inputs:
-            if elem.name == 'pastDueWeek':
-                for v in elem.value_options:
-                    # Parse option value ...
-                    # month=9&selectedWeek=09/11/2016&CurrentWkYear=2017
-                    datestr = v.split( sep='&' )[1].split( sep='=' )[-1]
-                    overdue_date = datetime.datetime.strptime( datestr, self.DATE_FORMAT )
-                    overdue_weekdates[ overdue_date.date() ] = v
+        try:
+            self.g.doc.choose_form( name='frmPastDueTimesheet' )
+        except ( DataNotFound ) as e:
+            pass
+        else:
+            for elem in self.g.doc.form.inputs:
+                if elem.name == 'pastDueWeek':
+                    for v in elem.value_options:
+                        # Parse option value ...
+                        # month=9&selectedWeek=09/11/2016&CurrentWkYear=2017
+                        datestr = v.split( sep='&' )[1].split( sep='=' )[-1]
+                        overdue_date = datetime.datetime.strptime( datestr, self.DATE_FORMAT )
+                        overdue_weekdates[ overdue_date.date() ] = v
         return overdue_weekdates
 
 
