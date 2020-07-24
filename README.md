@@ -29,7 +29,7 @@ This tool can be used in two possible ways: Docker and Python VirtualEnv
 1. ./run.sh --help
 
 ### VirtualEnv Installation Troubleshooting
-OpenSSL issues
+#### OpenSSL issues
 ```
 pycurl: libcurl link-time ssl backend (<library>) is different from compile-time ssl backend (<library> or "none/other")
 ```
@@ -38,6 +38,28 @@ If you get an error similar to the above, edit `setup.sh` to export the specific
 See also: http://stackoverflow.com/questions/21096436/ssl-backend-error-when-using-openssl
 
 See also: http://stackoverflow.com/questions/21487278/ssl-error-installing-pycurl-after-ssl-is-set
+
+#### PyCurl Issues
+Error:
+```
+Collecting pycurl (from -r requirements.txt (line 3))
+  Using cached https://files.pythonhosted.org/packages/ef/05/4b773f74f830a90a326b06f9b24e65506302ab049e825a3c0b60b1a6e26a/pycurl-7.43.0.5.tar.gz
+    Complete output from command python setup.py egg_info:
+    Traceback (most recent call last):
+      File "/tmp/pip-build-1tm87912/pycurl/setup.py", line 234, in configure_unix
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+      File "/usr/lib/python3.6/subprocess.py", line 729, in __init__
+        restore_signals, start_new_session)
+      File "/usr/lib/python3.6/subprocess.py", line 1364, in _execute_child
+        raise child_exception_type(errno_num, err_msg, err_filename)
+    FileNotFoundError: [Errno 2] No such file or directory: 'curl-config': 'curl-config'
+
+```
+Fix:
+```
+sudo apt-get install libssl-dev libcurl4-openssl-dev python3-dev
+```
+See also: https://github.com/pycurl/pycurl/issues/596
 
 # Usage
 ## Setup Environment Variables
