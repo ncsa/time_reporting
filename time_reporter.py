@@ -189,6 +189,7 @@ class Time_Reporter( object ):
         date_str = date.strftime( self.DATE_FORMAT )
         lp = 'SUBMIT_DATE_{0}'.format( date_str )
         self._submit( last_page=lp )
+        self.g.doc.save( 'form.submit.response' )
         assert_str = 'You have successfully submitted your time spent on University business for the week of {0}.'.format( date_str )
         self.g.doc.text_assert( assert_str )
 
